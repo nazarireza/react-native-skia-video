@@ -1,10 +1,10 @@
-import type { SkImage, SkSurface } from '@shopify/react-native-skia';
-import { Skia } from '@shopify/react-native-skia';
+import type { SkPicture, SkSize } from '@shopify/react-native-skia';
+import { createPicture } from '@shopify/react-native-skia';
 import {
-  useSharedValue,
-  useFrameCallback,
   runOnUI,
   type DerivedValue,
+  type SharedValue,
+  useDerivedValue,
 } from 'react-native-reanimated';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
@@ -14,7 +14,6 @@ import type {
 } from './types';
 import RNSkiaVideoModule from './RNSkiaVideoModule';
 import useEventListener from './utils/useEventListener';
-import { PixelRatio } from 'react-native';
 
 type UseVideoCompositionPlayerOptions<T = undefined> = {
   /**
@@ -38,13 +37,13 @@ type UseVideoCompositionPlayerOptions<T = undefined> = {
    */
   afterDrawFrame?: (context: T) => void;
   /**
-   * The width of rendered frames.
+   * The size of rendered frames.
    */
-  width: number;
+  size: SharedValue<SkSize>;
   /**
-   * The height of rendered frames.
+   * The current time in miliseconds
    */
-  height: number;
+  currentTime: SharedValue<number>;
   /**
    * Whether the composition should start playing automatically.
    */
@@ -78,7 +77,7 @@ type UseVideoCompositionPlayerReturnType = {
   /**
    * The current drawn frame of the video composition.
    */
-  currentFrame: DerivedValue<SkImage | null>;
+  currentScene: DerivedValue<SkPicture>;
   /**
    * The video player controller.
    */
@@ -93,8 +92,8 @@ export const useVideoCompositionPlayer = ({
   drawFrame,
   beforeDrawFrame,
   afterDrawFrame,
-  width,
-  height,
+  size,
+  currentTime,
   autoPlay = false,
   isLooping = false,
   onReadyToPlay,
@@ -117,13 +116,11 @@ export const useVideoCompositionPlayer = ({
     })();
   }, [framesExtractor]);
 
-  const currentFrame = useSharedValue<SkImage | null>(null);
   useEffect(
     () => () => {
-      currentFrame.value = null;
       framesExtractor?.dispose();
     },
-    [currentFrame, framesExtractor]
+    [framesExtractor]
   );
 
   const retry = useCallback(() => {
@@ -154,57 +151,28 @@ export const useVideoCompositionPlayer = ({
     }
   }, [framesExtractor, autoPlay]);
 
-  const surfaceSharedValue = useSharedValue<SkSurface | null>(null);
-  const pixelRatio = PixelRatio.get();
-  useFrameCallback(() => {
-    'worklet';
-    if (!framesExtractor) {
-      return;
-    }
+  const currentScene = useDerivedValue(() => {
+    return createPicture((canvas) => {
+      if (!framesExtractor) return;
 
-    let surface: SkSurface | null = surfaceSharedValue.value;
+      const context = beforeDrawFrame?.();
 
-    if (!surface) {
-      surface = Skia.Surface.MakeOffscreen(
-        width * pixelRatio,
-        height * pixelRatio
-      );
-      surfaceSharedValue.value = surface;
-    }
-    if (!surface) {
-      console.warn('Failed to create surface');
-      return;
-    }
+      drawFrame({
+        canvas,
+        context,
+        videoComposition: composition!,
+        currentTime: currentTime.value / 1000,
+        frames: framesExtractor.decodeCompositionFrames(),
+        width: size.value.width,
+        height: size.value.height,
+      });
 
-    const canvas = surface.getCanvas();
-    const context = beforeDrawFrame?.();
-    drawFrame({
-      canvas,
-      context,
-      videoComposition: composition!,
-      currentTime: framesExtractor.currentTime,
-      frames: framesExtractor.decodeCompositionFrames(),
-      width: width * pixelRatio,
-      height: height * pixelRatio,
+      afterDrawFrame?.(context);
     });
-    surface.flush();
-    const previousFrame = currentFrame.value;
-    try {
-      currentFrame.value = Skia.Image.MakeImageFromNativeTextureUnstable(
-        surface.getNativeTextureUnstable(),
-        width * pixelRatio,
-        height * pixelRatio
-      );
-    } catch (error) {
-      console.warn('Failed to create image from texture', error);
-      return;
-    }
-    previousFrame?.dispose();
-    afterDrawFrame?.(context);
-  }, true);
+  });
 
   return {
-    currentFrame,
+    currentScene,
     player: framesExtractor,
   };
 };
