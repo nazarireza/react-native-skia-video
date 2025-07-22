@@ -213,9 +213,9 @@ void VideoCompositionItemDecoder::release() {
     nextLoopFrames.clear();
     hasLooped = false;
     lastRequestedTime = kCMTimeInvalid;
-    [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
-    currentFrame = nullptr;
-    mtlTexture = nil;
+    // [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
+    // currentFrame = nullptr;
+    // mtlTexture = nil;
   }
 }
 
