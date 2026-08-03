@@ -1,5 +1,4 @@
-import { runOnJS } from 'react-native-reanimated';
-import { Platform } from 'react-native';
+import { scheduleOnRN } from 'react-native-worklets';
 import { Skia, BlendMode } from '@shopify/react-native-skia';
 import type { SkSurface } from '@shopify/react-native-skia';
 import type {
@@ -13,8 +12,6 @@ import RNSkiaVideoModule from './RNSkiaVideoModule';
 import { runOnNewThread } from './utils/thread';
 
 const Promise = global.Promise;
-
-const OS = Platform.OS;
 
 /**
  * Exports a video composition to a video file.
@@ -64,6 +61,7 @@ export const exportVideoComposition = async <T = undefined>({
 
       let surface: SkSurface | null = null;
       let frameExtractor: VideoCompositionFramesExtractorSync | null = null;
+      // eslint-disable-next-line no-useless-assignment -- TS needs the initializer for definite assignment
       let encoder: VideoEncoder | null = null;
       const { width, height } = options;
       try {
@@ -98,25 +96,22 @@ export const exportVideoComposition = async <T = undefined>({
             width: options.width,
             height: options.height,
           });
-          surface.flush();
-
-          // On iOS and macOS, the first flush is not synchronous,
-          // so we need to wait for the next frame
-          if (i === 0 && (OS === 'ios' || OS === 'macos')) {
-            RNSkiaVideoModule.usleep?.(1000);
-          }
+          // Synchronous flush: block until the GPU is done rendering the
+          // frame, since the encoder reads the surface's texture from its
+          // own command queue / GL context.
+          surface.flush(true);
           const texture = surface.getNativeTextureUnstable();
           encoder.encodeFrame(texture, currentTime);
           afterDrawFrame?.(context);
           if (onProgress) {
-            runOnJS(onProgress)({
+            scheduleOnRN(onProgress, {
               framesCompleted: i + 1,
               nbFrames,
             });
           }
         }
       } catch (e) {
-        runOnJS(reject)(e);
+        scheduleOnRN(reject, e);
         return;
       } finally {
         frameExtractor?.dispose();
@@ -126,11 +121,11 @@ export const exportVideoComposition = async <T = undefined>({
       try {
         encoder!.finishWriting();
       } catch (e) {
-        runOnJS(reject)(e);
+        scheduleOnRN(reject, e);
         return;
       } finally {
         encoder?.dispose();
       }
-      runOnJS(resolve)();
+      scheduleOnRN(resolve, undefined);
     });
   });

@@ -1,11 +1,8 @@
-#ifdef RCT_NEW_ARCH_ENABLED
+#import <React/RCTCallInvokerModule.h>
+
 #import "RNReactNativeSkiaVideoSpec.h"
 
-@interface ReactNativeSkiaVideo : NSObject <NativeReactNativeSkiaVideoSpec>
-#else
-#import <React/RCTBridgeModule.h>
-
-@interface ReactNativeSkiaVideo : NSObject <RCTBridgeModule>
-#endif
+@interface ReactNativeSkiaVideo
+    : NSObject <NativeReactNativeSkiaVideoSpec, RCTCallInvokerModule>
 
 @end
