@@ -255,8 +255,13 @@ void VideoCompositionItemDecoder::release() {
     nextLoopFrames.clear();
     hasLooped = false;
     lastRequestedTime = kCMTimeInvalid;
-    [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
     currentFrame = nullptr;
+  }
+}
+
+VideoCompositionItemDecoder::~VideoCompositionItemDecoder() {
+  @synchronized(lock) {
+    [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
     mtlTexture = nil;
   }
 }
