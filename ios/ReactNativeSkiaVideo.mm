@@ -7,7 +7,7 @@
 #import <ReactCommon/RCTTurboModule.h>
 #import <jsi/jsi.h>
 
-#import "JSIUtils.h"
+#import "RNSVJSIUtils.h"
 #import "VideoComposition.h"
 #import "VideoCompositionFramesExtractorHostObject.h"
 #import "VideoCompositionFramesExtractorSyncHostObject.h"

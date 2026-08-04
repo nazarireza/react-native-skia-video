@@ -1,6 +1,6 @@
 #import "VideoEncoderHostObject.h"
 #import "AudioCompositionUtils.h"
-#import "JSIUtils.h"
+#import "RNSVJSIUtils.h"
 #import <Metal/Metal.h>
 #import <future>
 

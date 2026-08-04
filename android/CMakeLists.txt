@@ -18,8 +18,8 @@ find_package(ReactAndroid REQUIRED CONFIG)
 
 add_library(${PACKAGE_NAME}
         SHARED
-        ../cpp/EventEmitter.h
-        ../cpp/EventEmitter.cpp
+        ../cpp/RNSVEventEmitter.h
+        ../cpp/RNSVEventEmitter.cpp
         cpp/JNIHelpers.h
         cpp/JNIHelpers.cpp
         cpp/cpp-adapter.cpp

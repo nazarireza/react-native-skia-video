@@ -1,7 +1,7 @@
 #include "VideoCompositionFramesExtractorSyncHostObject.h"
 
 #import "AVAssetTrackUtils.h"
-#import "JSIUtils.h"
+#import "RNSVJSIUtils.h"
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
 #import <future>

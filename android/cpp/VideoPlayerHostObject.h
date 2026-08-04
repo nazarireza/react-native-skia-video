@@ -4,7 +4,7 @@
 #include <jsi/jsi.h>
 #include <map>
 
-#include "EventEmitter.h"
+#include "RNSVEventEmitter.h"
 #include "SkiaContextHolder.h"
 #include "VideoPlayer.h"
 

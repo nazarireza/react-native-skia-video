@@ -2,7 +2,7 @@
 
 #import "AVAssetTrackUtils.h"
 #import "AudioCompositionUtils.h"
-#import "JSIUtils.h"
+#import "RNSVJSIUtils.h"
 #import <AVFoundation/AVFoundation.h>
 #import <Foundation/Foundation.h>
 #import <future>

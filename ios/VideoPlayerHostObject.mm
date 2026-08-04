@@ -6,7 +6,7 @@
 //
 
 #import "VideoPlayerHostObject.h"
-#import "JSIUtils.h"
+#import "RNSVJSIUtils.h"
 
 namespace RNSkiaVideo {
 using namespace facebook;

@@ -1,6 +1,6 @@
 #pragma once
 
-#import "EventEmitter.h"
+#import "RNSVEventEmitter.h"
 #import "VideoComposition.h"
 #import "VideoCompositionItemDecoder.h"
 #import "VideoFrame.h"

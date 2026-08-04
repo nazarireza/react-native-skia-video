@@ -1,5 +1,5 @@
 PODS:
-  - azzapp-react-native-skia-video (0.9.1):
+  - azzapp-react-native-skia-video (0.10.1):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2481,7 +2481,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  azzapp-react-native-skia-video: 731f9e32fffbebed2494ea0c474c61d6012f9473
+  azzapp-react-native-skia-video: 790a2106ee5c0e30b97785518d3e07789c4c2651
   FBLazyVector: 3c3be9a019176b5699455f7f66c5444b78a411c6
   hermes-engine: 23b753613897f88a4302abcd1421afdc1f7a2f44
   RCTDeprecation: bccb6545c26db881ecddfd83a3f9ea82aba1605f
