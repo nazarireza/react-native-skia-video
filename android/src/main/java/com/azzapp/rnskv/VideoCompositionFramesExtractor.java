@@ -7,6 +7,8 @@ import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 
+import androidx.media3.common.util.UnstableApi;
+
 import java.io.IOException;
 import java.util.Map;
 import javax.microedition.khronos.egl.EGLContext;
@@ -14,6 +16,7 @@ import javax.microedition.khronos.egl.EGLContext;
 /**
  * A class that previews a video composition.
  */
+@UnstableApi
 public class VideoCompositionFramesExtractor {
   private static final String TAG = "VideoCompositionFramesExtractor";
 
@@ -27,6 +30,8 @@ public class VideoCompositionFramesExtractor {
   private final VideoComposition composition;
 
   private final VideoCompositionDecoder decoder;
+
+  private AudioCompositionPlayer audioPlayer;
 
   private final PlaybackThread playbackThread;
 
@@ -47,6 +52,7 @@ public class VideoCompositionFramesExtractor {
   private long startTime = 0;
   private long pausePosition = 0;
   private boolean isEOS = false;
+  private boolean completeDispatched = false;
 
   /**
    * Create a new VideoCompositionFramesExtractor.
@@ -145,6 +151,12 @@ public class VideoCompositionFramesExtractor {
 
   private void prepareInternal() {
     decoder.start();
+    if (composition.hasAudio()) {
+      audioPlayer = new AudioCompositionPlayer(composition);
+      audioPlayer.setOnErrorListener(
+        message -> eventDispatcher.dispatchEvent("error", message));
+      audioPlayer.prepare();
+    }
     prepared = true;
     eventDispatcher.dispatchEvent("ready", null);
     handler.sendEmptyMessage(PLAYBACK_LOOP);
@@ -178,6 +190,9 @@ public class VideoCompositionFramesExtractor {
     }
     pausePosition = getCurrentPosition();
     isPlaying = false;
+    if (audioPlayer != null) {
+      audioPlayer.pause();
+    }
   }
 
   private void loopInternal() throws IOException, InterruptedException {
@@ -187,14 +202,22 @@ public class VideoCompositionFramesExtractor {
 
     isEOS = currentPosition >= TimeHelpers.secToUs(composition.getDuration());
     if (isEOS) {
-      eventDispatcher.dispatchEvent("complete", null);
+      if (!completeDispatched) {
+        completeDispatched = true;
+        eventDispatcher.dispatchEvent("complete", null);
+      }
       isPlaying = false;
       pausePosition = TimeHelpers.secToUs(composition.getDuration());
       currentPosition = pausePosition;
+    } else {
+      completeDispatched = false;
     }
     decoder.render(currentPosition);
     if (isEOS && looping) {
       playInternal();
+    }
+    if (audioPlayer != null) {
+      audioPlayer.update(getCurrentPosition(), isPlaying);
     }
     long delay = 10;
     long duration = (SystemClock.elapsedRealtime() - loopStartTime);
@@ -212,6 +235,9 @@ public class VideoCompositionFramesExtractor {
       return;
     }
     decoder.seekTo(position);
+    if (audioPlayer != null) {
+      audioPlayer.seekTo(position);
+    }
     if (isPlaying) {
       startTime = microTime() - position;
     } else {
@@ -220,6 +246,14 @@ public class VideoCompositionFramesExtractor {
   }
 
   private void releaseInternal() {
+    if (audioPlayer != null) {
+      try {
+        audioPlayer.release();
+      } catch (Exception e) {
+        Log.w(TAG, "Could not release the audio players", e);
+      }
+      audioPlayer = null;
+    }
     playbackThread.interrupt();
     playbackThread.quit();
     decoder.release();

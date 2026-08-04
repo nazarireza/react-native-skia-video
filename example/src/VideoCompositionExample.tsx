@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import pexelsClient from './helpers/pexelsClient';
 import type { Video } from 'pexels';
 import {
@@ -13,6 +13,7 @@ import {
   Text,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import {
   createNativeStackNavigator,
@@ -166,6 +167,9 @@ const PexelsVideoPicker = ({
   );
 };
 
+const MUSIC_URL =
+  'https://archive.org/download/OpenGoldbergVariations/Kimiko%20Ishizaka%20-%20J.S.%20Bach-%20-Open-%20Goldberg%20Variations%2C%20BWV%20988%20%28Piano%29%20-%2001%20Aria.mp3';
+
 const drawFrame: FrameDrawer = ({
   videoComposition,
   canvas,
@@ -177,6 +181,7 @@ const drawFrame: FrameDrawer = ({
   'worklet';
   const items = videoComposition.items.filter(
     (item) =>
+      item.kind !== 'audio' &&
       item.compositionStartTime <= currentTime &&
       item.compositionStartTime + item.duration >= currentTime
   );
@@ -248,13 +253,24 @@ const VideoCompositionPreview = ({
     params: { videos },
   },
 }: NativeStackScreenProps<StackParamList, 'PreviewComposition'>) => {
-  const [videoComposition, setVideoComposition] =
+  const [baseComposition, setBaseComposition] =
     useState<VideoComposition | null>(null);
+  const [musicPath, setMusicPath] = useState<string | null>(null);
+  const [musicEnabled, setMusicEnabled] = useState(true);
 
   useEffect(() => {
     const promises: StatefulPromise<any>[] = [];
 
     const fetchFiles = async () => {
+      const musicFilePath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/open-goldberg-aria.mp3`;
+      let musicPromise: StatefulPromise<FetchBlobResponse> | null = null;
+      if (!(await ReactNativeBlobUtil.fs.exists(musicFilePath))) {
+        musicPromise = ReactNativeBlobUtil.config({
+          path: musicFilePath,
+        }).fetch('GET', MUSIC_URL);
+        promises.push(musicPromise);
+      }
+
       const videoUrls: Record<number, StatefulPromise<FetchBlobResponse>> = {};
       for (const video of videos) {
         const uri =
@@ -276,8 +292,13 @@ const VideoCompositionPreview = ({
         videoFiles = await Promise.all(
           Object.entries(videoUrls).map(async ([id, promise]) => {
             const response = await promise;
-            const path = response.path();
-            return { id: Number(id), path };
+            const status = response.info().status;
+            if (status !== 200) {
+              throw new Error(
+                `Could not download video ${id} (status ${status})`
+              );
+            }
+            return { id: Number(id), path: response.path() };
           })
         );
       } catch (error) {
@@ -285,6 +306,23 @@ const VideoCompositionPreview = ({
           console.error(error);
         }
         return;
+      }
+      try {
+        if (musicPromise != null) {
+          const musicResponse = await musicPromise;
+          const status = musicResponse.info().status;
+          if (status !== 200) {
+            throw new Error(
+              `Could not download the background music (status ${status})`
+            );
+          }
+        }
+        setMusicPath(musicFilePath);
+      } catch (error) {
+        await ReactNativeBlobUtil.fs.unlink(musicFilePath).catch(() => {});
+        if (!(error instanceof ReactNativeBlobUtil.CanceledFetchError)) {
+          console.error(error);
+        }
       }
       const videoWithFiles = videos
         .map((video) => ({
@@ -307,12 +345,13 @@ const VideoCompositionPreview = ({
             startTime: 0,
             compositionStartTime: currentTime,
             duration,
+            audio: true,
           };
           currentTime += duration - 1;
           return item;
         }),
       };
-      setVideoComposition(composition);
+      setBaseComposition(composition);
     };
 
     fetchFiles();
@@ -323,6 +362,30 @@ const VideoCompositionPreview = ({
       });
     };
   }, [videos]);
+
+  const videoComposition = useMemo<VideoComposition | null>(() => {
+    if (!baseComposition) {
+      return null;
+    }
+    if (!musicEnabled || !musicPath) {
+      return baseComposition;
+    }
+    return {
+      ...baseComposition,
+      items: [
+        ...baseComposition.items,
+        {
+          id: 'music',
+          kind: 'audio',
+          path: musicPath,
+          compositionStartTime: 0,
+          startTime: 0,
+          duration: baseComposition.duration,
+          volume: 0.3,
+        },
+      ],
+    };
+  }, [baseComposition, musicEnabled, musicPath]);
 
   const [exporting, setExporting] = useState(false);
   const [exportedPath, setExportedPath] = useState<string | null>(null);
@@ -385,6 +448,14 @@ const VideoCompositionPreview = ({
 
   const { width: windowWidth } = useWindowDimensions();
 
+  const onPlayerError = useCallback((error: any, retry: () => void) => {
+    console.error('Composition player error:', error);
+    Alert.alert('Composition player error', String(error?.message ?? error), [
+      { text: 'Retry', onPress: retry },
+      { text: 'Cancel' },
+    ]);
+  }, []);
+
   const { currentFrame, player } = useVideoCompositionPlayer({
     composition: exporting ? null : videoComposition,
     autoPlay: true,
@@ -392,6 +463,7 @@ const VideoCompositionPreview = ({
     drawFrame,
     width: windowWidth,
     height: windowWidth,
+    onError: onPlayerError,
   });
 
   const [isPlaying, setIsPlaying] = useState(true);
@@ -470,6 +542,16 @@ const VideoCompositionPreview = ({
                 maximumTrackTintColor={'#CCC'}
                 minimumTrackTintColor={'#F00'}
               />
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Text style={{ color: 'black' }}>Background music</Text>
+                <Switch
+                  value={musicEnabled && musicPath != null}
+                  disabled={musicPath == null}
+                  onValueChange={setMusicEnabled}
+                />
+              </View>
               <View
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
               >
