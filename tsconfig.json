@@ -28,5 +28,6 @@
     "target": "esnext",
     "types": ["node", "jest"],
     "verbatimModuleSyntax": true
-  }
+  },
+  "exclude": ["node_modules", "lib", "docs"]
 }
