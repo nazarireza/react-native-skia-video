@@ -1,0 +1,77 @@
+---
+id: exporting
+title: Exporting
+sidebar_position: 4
+---
+
+# Exporting
+
+`exportVideoComposition` renders a composition to an H.264 file. It runs on a
+dedicated worklet thread: a synchronous extractor decodes the exact frame for
+each timestamp, your `drawFrame` renders it into an offscreen Skia surface,
+and the surface's texture is handed straight to the hardware encoder
+(MediaCodec on Android, AVAssetWriter on iOS) — no pixel readback. Audio
+items are mixed and encoded alongside.
+
+```ts
+import { exportVideoComposition } from '@azzapp/react-native-skia-video';
+
+await exportVideoComposition({
+  videoComposition: composition,
+  drawFrame, // the SAME worklet as the preview
+  outPath: '/path/to/output.mp4',
+  width: 1080,
+  height: 1920,
+  frameRate: 30,
+  bitRate: 8_000_000,
+  onProgress: ({ framesCompleted, nbFrames }) =>
+    setProgress(framesCompleted / nbFrames),
+});
+```
+
+## Options
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `videoComposition` | `VideoComposition` | The composition to render. |
+| `drawFrame` | `FrameDrawer` | Worklet drawing each frame. |
+| `outPath` | `string` | Destination file path (no `file://` scheme). |
+| `width` / `height` | `number` | Output resolution in pixels. |
+| `frameRate` | `number` | Frames per second. |
+| `bitRate` | `number` | Video bit rate in bits per second. |
+| `encoderName` | `string` | Android only: a specific encoder from [`getValidEncoderConfigurations`](/docs/android-capabilities). |
+| `audioBitRate` / `audioSampleRate` / `audioChannelCount` | `number` | AAC settings when the composition [has audio](/docs/video-composition/audio). |
+| `onProgress` | `({ framesCompleted, nbFrames }) => void` | Called after each encoded frame. |
+| `abortSignal` | `AbortSignal` | Cancels the export; the promise rejects with an `AbortError`. |
+| `beforeDrawFrame` / `afterDrawFrame` | functions | Per-frame context hooks, as in playback. |
+
+## Cancellation
+
+```ts
+const controller = new AbortController();
+exportVideoComposition({ ...options, abortSignal: controller.signal }).catch(
+  (e) => {
+    if (e.name === 'AbortError') return; // user cancelled
+    throw e;
+  }
+);
+// later…
+controller.abort();
+```
+
+## Good practices
+
+- **Reuse the preview's `drawFrame`.** That's the whole point: pass the same
+  worklet (with the same state snapshot) and the exported file matches the
+  preview pixel for pixel.
+- **Prime per-runtime caches.** The export runs on its own worklet runtime:
+  Skia objects cached for the preview (UI runtime) are not visible there.
+  Capture raw bytes in the export closure and decode them on first frame, or
+  rebuild caches lazily.
+- **Negotiate the configuration on Android.** Encoders differ wildly between
+  devices; feed your target settings through
+  [`getValidEncoderConfigurations`](/docs/android-capabilities) and use the
+  first result.
+- **Cap decode resolutions.** Item `resolution` also applies during export;
+  decoding 4K sources to render 1080p output wastes decoder sessions (some
+  devices only have a few).
