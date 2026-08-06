@@ -2,6 +2,8 @@
 
 Video encoding/decoding support for [React Native Skia](https://github.com/Shopify/react-native-skia)
 
+> 📖 **[Documentation](https://azzappapp.github.io/react-native-skia-video/)** — getting started, guides (video player, compositions, audio, exporting), full API reference and a [complete example app](https://azzappapp.github.io/react-native-skia-video/docs/example).
+
 > ⚠️ This library is still a beta in a very unstable state
 
 ## Installation
