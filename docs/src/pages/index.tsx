@@ -62,7 +62,10 @@ export default function Home(): ReactNode {
           encoders — audio included.
         </p>
         <div className={styles.buttons}>
-          <Link className="button button--primary button--lg" to="/docs/getting-started">
+          <Link
+            className="button button--primary button--lg"
+            to="/docs/getting-started"
+          >
             Get Started
           </Link>
           <Link
@@ -107,7 +110,10 @@ export default function Home(): ReactNode {
                 royalty-free soundtracks and a hardware-encoded 1080p export —
                 in about 15 small, documented files.
               </p>
-              <div className={styles.buttons} style={{ justifyContent: 'flex-start' }}>
+              <div
+                className={styles.buttons}
+                style={{ justifyContent: 'flex-start' }}
+              >
                 <Link className="button button--primary" to="/docs/example">
                   Read the walkthrough
                 </Link>
