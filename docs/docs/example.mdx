@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Five complete, tutorial-grade apps built on this library — each one a small,
+Six complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -145,7 +145,34 @@ What it demonstrates best:
   back-to-back in the composition, the drawer picking the active item
   ([`composition.ts`](https://github.com/mlecoq/react-native-chroma-key/blob/main/src/editor/composition.ts)).
 
-## Patterns shared by all five
+## Privacy Studio — on-device face anonymization
+
+<p align="center">
+  <img src="/react-native-skia-video/img/privacy-studio.gif" width="240" alt="Privacy Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-privacy-studio**](https://github.com/mlecoq/react-native-privacy-studio)
+— blurs, pixelates or emoji-covers every face in a video. Faces are detected
+on-device (ML Kit on frames pulled with `expo-video-thumbnails`), and the
+bundled interview sample ships its face track as JSON — the exact shape the
+on-device analysis produces.
+
+What it demonstrates best:
+
+- **Feeding ML output into the pipeline** — detection runs once when a video
+  is picked (seconds, with a progress bar), producing plain JSON; playback
+  and export just interpolate it
+  ([`analyzeVideo.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/analyzeVideo.ts)).
+- **Detections become tracks** — a tiny greedy IoU tracker turns flickery
+  per-frame boxes into stable per-person tracks that fade in and out; a pure
+  worklet interpolates them at any playback time
+  ([`faceTracks.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/faceTracks.ts)).
+- **Three effects from one clip** — the video shader redrawn through a blur
+  image filter, a three-line pixelate SkSL, or a Twemoji PNG, clipped to
+  each face
+  ([`drawFrame.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/drawFrame.ts)).
+
+## Patterns shared by all six
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
