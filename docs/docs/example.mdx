@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Three complete, tutorial-grade apps built on this library — each one a small,
+Five complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -92,7 +92,60 @@ What it demonstrates best:
   SkSL shader whose warp deepens with the bass
   ([`scenes.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/visualizer/scenes.ts)).
 
-## Patterns shared by all three
+## Frame Studio — a screen-recording beautifier
+
+<p align="center">
+  <img src="/react-native-skia-video/img/frame-studio.gif" width="240" alt="Frame Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-frame-studio**](https://github.com/mlecoq/react-native-frame-studio)
+— gives any screen recording a product-demo look: wallpaper gradient
+background, rounded shadowed frame, and cinematic tap-to-plant zooms that
+ease in, hold and ease back out. The simplest engine of the series — no
+text, no images, no audio analysis, just animated geometry over one video.
+
+What it demonstrates best:
+
+- **A camera as pure functions** — a zoom point plays out as
+  *ease → hold → ease*; `getZoomAt(points, t)` returns the active transform
+  and edge clamping keeps the wallpaper from leaking through
+  ([`zoom.ts`](https://github.com/mlecoq/react-native-frame-studio/blob/main/src/editor/zoom.ts)).
+- **One canvas transform inside a clip** — the frame never moves; the
+  recording glides under a `clipRRect`
+  ([`drawFrame.ts`](https://github.com/mlecoq/react-native-frame-studio/blob/main/src/editor/drawFrame.ts)).
+- **Gestures and drawer sharing geometry** — the recording's placement is a
+  pure function used by both the worklet and the tap handler
+  ([`VideoPreview.tsx`](https://github.com/mlecoq/react-native-frame-studio/blob/main/src/components/VideoPreview.tsx)).
+
+## Chroma Studio — a green-screen keyer
+
+<p align="center">
+  <img src="/react-native-skia-video/img/chroma-studio.gif" width="240" alt="Chroma Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-chroma-key**](https://github.com/mlecoq/react-native-chroma-key)
+— removes the green screen from a video and composites it over a photo or a
+looping video, with live keying controls. Ships an animated parrot-on-green
+sample; the whole effect is one SkSL shader.
+
+What it demonstrates best:
+
+- **A video frame as a child shader** — the cover-fitted frame shader is
+  handed to the keying effect via `makeShaderWithChildren`, which samples it
+  per pixel
+  ([`drawFrame.ts`](https://github.com/mlecoq/react-native-chroma-key/blob/main/src/editor/drawFrame.ts)).
+- **Keying in the chroma plane** — colors are compared on the Cb/Cr axes of
+  YCbCr, so brightness variations of the backdrop key out together;
+  tolerance/softness/spill are plain uniforms
+  ([`chromaKey.ts`](https://github.com/mlecoq/react-native-chroma-key/blob/main/src/editor/chromaKey.ts)).
+- **Live uniforms without React renders** — dragging a slider writes a
+  shared value the drawer reads on the next frame; release commits to state
+  ([`KeySheet.tsx`](https://github.com/mlecoq/react-native-chroma-key/blob/main/src/components/sheets/KeySheet.tsx)).
+- **Looping a background video by scheduling** — the same file repeated
+  back-to-back in the composition, the drawer picking the active item
+  ([`composition.ts`](https://github.com/mlecoq/react-native-chroma-key/blob/main/src/editor/composition.ts)).
+
+## Patterns shared by all five
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
