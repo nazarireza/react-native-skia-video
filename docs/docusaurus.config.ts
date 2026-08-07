@@ -58,7 +58,7 @@ const config: Config = {
           label: 'Docs',
         },
         { to: '/docs/api', label: 'API', position: 'left' },
-        { to: '/docs/example', label: 'Example', position: 'left' },
+        { to: '/docs/example', label: 'Examples', position: 'left' },
         {
           href: 'https://github.com/AzzappApp/react-native-skia-video',
           label: 'GitHub',

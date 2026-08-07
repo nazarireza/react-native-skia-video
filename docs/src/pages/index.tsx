@@ -104,24 +104,19 @@ export default function Home(): ReactNode {
             <div className={styles.demoText}>
               <Heading as="h2">Learn by example</Heading>
               <p>
-                <strong>Island Studio</strong> is a complete tutorial app built
-                on this library: montage of gallery clips, SkSL shader
-                transitions, draggable text and image overlays, bundled
-                royalty-free soundtracks and a hardware-encoded 1080p export —
-                in about 15 small, documented files.
+                Three complete tutorial apps are built on this library:
+                <strong> Island Studio</strong> (a tiny video editor — montage,
+                shader transitions, draggable overlays, soundtracks),
+                <strong> Caption Studio</strong> (word-timed auto-captions) and
+                <strong> Wave Studio</strong> (an audio-reactive music
+                visualizer with no video items at all).
               </p>
               <div
                 className={styles.buttons}
                 style={{ justifyContent: 'flex-start' }}
               >
                 <Link className="button button--primary" to="/docs/example">
-                  Read the walkthrough
-                </Link>
-                <Link
-                  className="button button--secondary button--outline"
-                  href="https://github.com/mlecoq/react-native-video-editor"
-                >
-                  Browse the code
+                  Browse the examples
                 </Link>
               </div>
             </div>

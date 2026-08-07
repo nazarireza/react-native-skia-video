@@ -82,9 +82,3 @@ configurable through the [export options](/docs/video-composition/exporting):
 | `audioBitRate` | `128000` | Bit rate in bits per second. |
 | `audioSampleRate` | `44100` | Sample rate in Hz. |
 | `audioChannelCount` | `2` | 1 = mono, 2 = stereo. |
-
-:::tip iOS silent switch
-Playback respects the app's audio session. Configure a *playback* session
-(e.g. `setAudioModeAsync({ playsInSilentMode: true })` with `expo-audio`),
-otherwise iOS mutes your composition whenever the ring switch is on silent.
-:::
