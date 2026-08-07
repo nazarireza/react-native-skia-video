@@ -1,93 +1,114 @@
 ---
 id: example
-title: 'Example: Island Studio'
+title: Examples
 sidebar_position: 5
 slug: /example
 ---
 
-# Island Studio — a full video editor
+# Examples
 
-[**Island Studio**](https://github.com/mlecoq/react-native-video-editor) is a
-complete, tutorial-grade video editor built on this library. It's the best
-place to see every feature working together in real code — about 15 small,
-documented files.
-
-<p align="center">
-  <img src="/react-native-skia-video/img/island-studio.gif" width="260" alt="Island Studio demo" style={{ borderRadius: 16 }} />
-</p>
-
-**What it does:** montage of up to 6 photos/videos from the gallery (or
-bundled island-themed samples), SkSL shader transitions between clips,
-draggable/pinchable text and image overlays with enter/exit animations,
-royalty-free soundtracks looped over the montage, and a hardware-encoded
-1080×1920 export saved to the photo library.
+Three complete, tutorial-grade apps built on this library — each one a small,
+documented codebase exercising a different part of the API. They share the
+same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
+worklet renders both the live preview and the export.
 
 ```sh
-git clone https://github.com/mlecoq/react-native-video-editor
-cd react-native-video-editor
-npm install
-npx expo prebuild
-npx expo run:ios # or run:android
+git clone <repo> && cd <repo>
+npm install && npx expo prebuild && npx expo run:ios   # or run:android
 ```
 
-## The architecture in one diagram
+## Island Studio — a tiny video editor
 
-```
-        EditorState (plain data, geometry as canvas fractions)
-                             │
-                    drawFrame worklet  ★ src/editor/drawFrame.ts
-              ┌──────────────┼──────────────────┐
-        clips + SkSL     image overlays     text overlays
-        transitions      (SkImage cache)    (paragraph cache)
-              │                                  │
-   ┌──────────┴───────────┐          ┌───────────┴──────────┐
-   │ useVideoComposition  │          │ exportVideoComposition│
-   │ Player (preview)     │          │ (background export)   │
-   └──────────────────────┘          └───────────────────────┘
-```
+<p align="center">
+  <img src="/react-native-skia-video/img/island-studio.gif" width="240" alt="Island Studio demo" style={{ borderRadius: 16 }} />
+</p>
 
-One `drawFrame` renders both the live preview and the export — the pattern
-this library is designed around.
+[**mlecoq/react-native-video-editor**](https://github.com/mlecoq/react-native-video-editor)
+— montage of gallery clips (up to 6), SkSL shader transitions between clips,
+draggable/pinchable text and image overlays with enter/exit animations,
+looping royalty-free soundtracks, hardware-encoded 1080×1920 export.
 
-## Patterns worth stealing
+What it demonstrates best:
 
-**Timeline with transition overlap** — clips store durations, not start
-times. An accumulator derives start times, overlapping each clip with the
-previous one by the transition duration; during the overlap both clips are
-active and a shader blends them
-([`timeline.ts`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/editor/timeline.ts)).
+- **Timeline with transition overlap** — clips store durations; start times
+  come from an accumulator that overlaps each clip with the previous one, and
+  both live clips are handed to a transition shader
+  ([`timeline.ts`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/editor/timeline.ts)).
+- **Transitions as SkSL shaders** — adding one is copy-pasting from
+  [gl-transitions](https://gl-transitions.com/)
+  ([`transitions.ts`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/editor/transitions.ts)).
+- **Gestures without React renders** — drags write into a shared value merged
+  by the drawer on the UI thread
+  ([`VideoPreview.tsx`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/components/VideoPreview.tsx)).
+- **Looping music** — chained `kind: 'audio'` items ([Audio guide](/docs/video-composition/audio)).
 
-**Transitions as SkSL shaders** — each transition is a few lines of SkSL
-receiving the two frames as child shaders and a `progress` uniform. Adding
-one is copy-pasting from [gl-transitions](https://gl-transitions.com/)
-([`transitions.ts`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/editor/transitions.ts)).
+## Caption Studio — auto-captions
 
-**Gestures without React renders** — dragging an overlay writes into a
-Reanimated shared value that `drawFrame` merges over the selected layer;
-React state is only committed when the fingers lift
-([`VideoPreview.tsx`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/components/VideoPreview.tsx)).
+<p align="center">
+  <img src="/react-native-skia-video/img/caption-studio.gif" width="240" alt="Caption Studio demo" style={{ borderRadius: 16 }} />
+</p>
 
-**Resolution independence** — all overlay geometry lives in fractions of the
-canvas, so the ~200pt preview and the 1080×1920 export render the exact same
-composition.
+[**mlecoq/react-native-auto-captions**](https://github.com/mlecoq/react-native-auto-captions)
+— burns animated, word-timed captions into any video. Parses Whisper
+`verbose_json` (word timestamps), SRT or plain text; four caption styles
+(word-by-word pop, karaoke color sweep, pill box, minimal); drag/pinch
+placement; export keeps the original audio. The bundled sample carries a
+real neural voice-over aligned with its transcript.
 
-**Assets across worklet runtimes** — Skia objects can't hop between
-runtimes; raw `Uint8Array`s can. Images and fonts are kept as bytes and each
-runtime decodes + caches its own `SkImage`s, typefaces and laid-out
-paragraphs
-([`skiaCache.ts`](https://github.com/mlecoq/react-native-video-editor/blob/main/src/editor/skiaCache.ts)).
+What it demonstrates best:
 
-**Looping music** — the soundtrack is chained `kind: 'audio'` items covering
-the montage duration, mixed into the export automatically
-([Audio guide](/docs/video-composition/audio)).
+- **Time-driven text** — captions are a pure function of
+  `(currentTime, transcript, settings)`
+  ([`drawCaptions.ts`](https://github.com/mlecoq/react-native-auto-captions/blob/main/src/captions/drawCaptions.ts)).
+- **Paragraph caching** — paragraphs are built once per *spoken word state*
+  (highlights are styled text runs), never per frame
+  ([`skiaCache.ts`](https://github.com/mlecoq/react-native-auto-captions/blob/main/src/editor/skiaCache.ts)).
+- **Passing a video's own audio through** the preview and the export
+  (`audio: true` on the video item).
 
-## Common pitfalls it solves
+## Wave Studio — a music visualizer
 
-- **Worklet helpers must be defined before their callers** — closures are
-  captured at the definition site; a helper declared further down the file is
-  captured uninitialized and crashes at runtime.
-- **iOS silent switch** — without a playback audio session
-  (`playsInSilentMode`), compositions appear muted on device.
-- **Version matrix** — the example pins the combination shipped in
-  production by Azzapp: `@shopify/react-native-skia` 2.6.x, Reanimated 4.5,
+<p align="center">
+  <img src="/react-native-skia-video/img/wave-studio.gif" width="240" alt="Wave Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-music-visualizer**](https://github.com/mlecoq/react-native-music-visualizer)
+— flips the pipeline: the composition contains **no video items at all**,
+just one audio item. Every pixel is generated from precomputed audio
+analysis. Three scenes (radial spectrum ring, glowing oscilloscope,
+audio-reactive SkSL shader clouds), color themes, custom artwork, 1080×1920
+export with the track as its soundtrack.
+
+What it demonstrates best:
+
+- **Audio-only compositions** — the frames extractor drives the clock and
+  plays the track; `frames` stays empty
+  ([`composition.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/editor/composition.ts)).
+- **Analysis as data, not DSP** — a build-time Node script (FFT included)
+  precomputes bass/mid/high envelopes, spectrum and waveform per frame; the
+  worklet just indexes the JSON
+  ([`scripts/analyze-track.mjs`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/scripts/analyze-track.mjs)).
+- **Audio bands as shader uniforms** — the Nebula scene is a full-screen
+  SkSL shader whose warp deepens with the bass
+  ([`scenes.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/visualizer/scenes.ts)).
+
+## Patterns shared by all three
+
+- **One worklet for preview and export** — what you see is exactly what you
+  save; there is no second rendering path to keep in sync.
+- **Resolution independence** — all geometry lives in fractions of the
+  canvas, so the small preview and the full-size export render the same
+  composition.
+- **Assets across worklet runtimes** — images travel as raw `Uint8Array`s
+  and each runtime decodes its own `SkImage`s; the Skia typeface provider is
+  created once on the JS thread and captured by the worklets. Skia objects
+  built inside a runtime (paragraphs, compiled shaders) are cached per
+  runtime on `globalThis`.
+- **Worklet helpers are defined before their callers** — closures are
+  captured at the definition site; a helper declared further down the file
+  would be captured uninitialized and crash at runtime.
+- **iOS playback session** — without `playsInSilentMode`, iOS mutes the app
+  while the ring switch is on silent.
+- **Version matrix** — the examples track the combination shipped in
+  production by Azzapp: `@shopify/react-native-skia` 2.10.x, Reanimated 4.5,
   skia-video 0.10.
