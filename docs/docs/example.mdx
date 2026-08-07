@@ -153,8 +153,9 @@ What it demonstrates best:
 
 [**mlecoq/react-native-privacy-studio**](https://github.com/mlecoq/react-native-privacy-studio)
 — blurs, pixelates or emoji-covers every face in a video. Faces are detected
-on-device (ML Kit on frames pulled with `expo-video-thumbnails`), and the
-bundled interview sample ships its face track as JSON — the exact shape the
+on-device (Apple Vision on iOS, ML Kit on Android — a 40-line local Expo
+module — on frames pulled with `expo-video-thumbnails`), and the bundled
+interview sample ships its face track as JSON — the exact shape the
 on-device analysis produces.
 
 What it demonstrates best:
@@ -163,6 +164,10 @@ What it demonstrates best:
   is picked (seconds, with a progress bar), producing plain JSON; playback
   and export just interpolate it
   ([`analyzeVideo.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/analyzeVideo.ts)).
+- **A local Expo Module when wrappers get in the way** — one JS API, Apple
+  Vision behind it on iOS (simulator-friendly, no ML Kit pod), ML Kit on
+  Android
+  ([`modules/face-detector`](https://github.com/mlecoq/react-native-privacy-studio/tree/main/modules/face-detector)).
 - **Detections become tracks** — a tiny greedy IoU tracker turns flickery
   per-frame boxes into stable per-person tracks that fade in and out; a pure
   worklet interpolates them at any playback time
