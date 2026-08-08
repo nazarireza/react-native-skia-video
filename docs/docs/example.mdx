@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Six complete, tutorial-grade apps built on this library — each one a small,
+Seven complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -177,7 +177,36 @@ What it demonstrates best:
   each face
   ([`drawFrame.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/drawFrame.ts)).
 
-## Patterns shared by all six
+## Reframe Studio — landscape interviews into vertical shorts
+
+<p align="center">
+  <img src="/react-native-skia-video/img/reframe-studio.gif" width="240" alt="Reframe Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-reframe-studio**](https://github.com/mlecoq/react-native-reframe-studio)
+— picks a moment out of a long landscape video, follows the speakers with a
+virtual camera, burns captions on top and exports a 9:16 short. It puts the
+face detection of Privacy Studio and the caption engine of Caption Studio
+behind one pipeline.
+
+What it demonstrates best:
+
+- **Trimming is free** — `startTime` on the composition item tells the
+  decoder where to begin, so a three-hour podcast costs exactly what a
+  30-second clip costs. Picking the moment *before* analyzing is what keeps
+  the on-device face pass proportional to the clip you keep
+  ([`composition.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/composition.ts)).
+- **A camera path, not camera math** — dead zone, eased follow with a speed
+  cap, hard cuts instead of long pans, focus hysteresis: decisions that read
+  better as a JS loop run once after the analysis. The worklet only
+  interpolates the result, and never across a cut
+  ([`camera.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/camera.ts)).
+- **Two spaces that never meet** — the camera works in source space, the
+  captions in output space, drawn after the crop transform is restored; the
+  caption engine doesn't even know the video was cropped
+  ([`drawFrame.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/drawFrame.ts)).
+
+## Patterns shared by all seven
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
