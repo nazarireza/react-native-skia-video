@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Seven complete, tutorial-grade apps built on this library — each one a small,
+Eight complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -206,7 +206,37 @@ What it demonstrates best:
   caption engine doesn't even know the video was cropped
   ([`drawFrame.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/drawFrame.ts)).
 
-## Patterns shared by all seven
+## Cut Studio — silence-removal jump cuts
+
+<p align="center">
+  <img src="/react-native-skia-video/img/cut-studio.gif" width="240" alt="Cut Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-cut-studio**](https://github.com/mlecoq/react-native-cut-studio)
+— points at a raw talking take and cuts every pause out of it, Descript-style,
+entirely on-device. The first app of the series where two libraries split the
+work: [react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)
+decodes the sound, this library plays the cut.
+
+What it demonstrates best:
+
+- **The composition IS the edit** — every kept span is one item playing the
+  same file at a different `startTime`; since trimming is free, forty jump
+  cuts cost no more than playing the file once, and the items' audio makes
+  the soundtrack jump-cut for free too
+  ([`composition.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/composition.ts)).
+- **Feeding decoded audio into the pipeline** — `decodeAudioData` produces
+  PCM on-device; the app reduces it to a plain loudness envelope and finds
+  the silences in ~30 lines of pure JS with hysteresis and padding
+  ([`audio.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/audio.ts),
+  [`cuts.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/cuts.ts)).
+- **Two clocks, one playhead** — the preview runs on the composition clock
+  (silences skipped), the waveform timeline on the source clock (silences
+  visible); a tiny worklet maps one to the other on every frame, so the
+  playhead visibly leaps over each cut
+  ([`Timeline.tsx`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/components/Timeline.tsx)).
+
+## Patterns shared by all eight
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
