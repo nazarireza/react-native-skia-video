@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Eight complete, tutorial-grade apps built on this library — each one a small,
+Seven complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -84,10 +84,15 @@ What it demonstrates best:
 - **Audio-only compositions** — the frames extractor drives the clock and
   plays the track; `frames` stays empty
   ([`composition.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/editor/composition.ts)).
-- **Analysis as data, not DSP** — a build-time Node script (FFT included)
-  precomputes bass/mid/high envelopes, spectrum and waveform per frame; the
-  worklet just indexes the JSON
+- **Analysis as data, not DSP** — bass/mid/high envelopes, spectrum and
+  waveform are precomputed per frame; the worklet just indexes the JSON
   ([`scripts/analyze-track.mjs`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/scripts/analyze-track.mjs)).
+- **Your own music, analyzed on-device** — pick any audio file:
+  [react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)
+  decodes it to PCM and the exact same FFT pass runs on the phone, yielding
+  to the UI under a progress bar — the visualizer can't tell a picked song
+  from a bundled one
+  ([`analyzeTrack.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/audio/analyzeTrack.ts)).
 - **Audio bands as shader uniforms** — the Nebula scene is a full-screen
   SkSL shader whose warp deepens with the bass
   ([`scenes.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/visualizer/scenes.ts)).
@@ -185,58 +190,40 @@ What it demonstrates best:
 
 [**mlecoq/react-native-reframe-studio**](https://github.com/mlecoq/react-native-reframe-studio)
 — picks a moment out of a long landscape video, follows the speakers with a
-virtual camera, burns captions on top and exports a 9:16 short. It puts the
-face detection of Privacy Studio and the caption engine of Caption Studio
-behind one pipeline.
+virtual camera, transcribes the clip with Whisper **on the device** and
+exports a captioned 9:16 short. It puts the face detection of Privacy
+Studio and the caption engine of Caption Studio behind one pipeline.
 
 What it demonstrates best:
 
 - **Trimming is free** — `startTime` on the composition item tells the
   decoder where to begin, so a three-hour podcast costs exactly what a
   30-second clip costs. Picking the moment *before* analyzing is what keeps
-  the on-device face pass proportional to the clip you keep
+  the on-device face pass — and the Whisper pass — proportional to the clip
+  you keep
   ([`composition.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/composition.ts)).
+- **A picker that listens** — the audio track is decoded to a plain loudness
+  envelope ([react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)):
+  waveform under the filmstrip, released handles snap to the nearest pause
+  so a clip never starts mid-word, and the most talkative windows are
+  offered as one-tap suggested moments
+  ([`moments.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/moments.ts)).
+- **True auto-captions** — whisper.cpp transcribes the segment on the phone;
+  token timestamps are glued back into words and grouped into caption-sized
+  phrases, all pure functions
+  ([`transcribe.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/captions/transcribe.ts)).
 - **A camera path, not camera math** — dead zone, eased follow with a speed
-  cap, hard cuts instead of long pans, focus hysteresis: decisions that read
-  better as a JS loop run once after the analysis. The worklet only
-  interpolates the result, and never across a cut
+  cap, cuts (never pans) when focus moves to another person, a statue filter
+  for face-shaped things that never move: decisions that read better as a JS
+  loop run once after the analysis. The worklet only interpolates the
+  result, and never across a cut
   ([`camera.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/camera.ts)).
 - **Two spaces that never meet** — the camera works in source space, the
   captions in output space, drawn after the crop transform is restored; the
   caption engine doesn't even know the video was cropped
   ([`drawFrame.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/drawFrame.ts)).
 
-## Cut Studio — silence-removal jump cuts
-
-<p align="center">
-  <img src="/react-native-skia-video/img/cut-studio.gif" width="240" alt="Cut Studio demo" style={{ borderRadius: 16 }} />
-</p>
-
-[**mlecoq/react-native-cut-studio**](https://github.com/mlecoq/react-native-cut-studio)
-— points at a raw talking take and cuts every pause out of it, Descript-style,
-entirely on-device. The first app of the series where two libraries split the
-work: [react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)
-decodes the sound, this library plays the cut.
-
-What it demonstrates best:
-
-- **The composition IS the edit** — every kept span is one item playing the
-  same file at a different `startTime`; since trimming is free, forty jump
-  cuts cost no more than playing the file once, and the items' audio makes
-  the soundtrack jump-cut for free too
-  ([`composition.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/composition.ts)).
-- **Feeding decoded audio into the pipeline** — `decodeAudioData` produces
-  PCM on-device; the app reduces it to a plain loudness envelope and finds
-  the silences in ~30 lines of pure JS with hysteresis and padding
-  ([`audio.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/audio.ts),
-  [`cuts.ts`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/editor/cuts.ts)).
-- **Two clocks, one playhead** — the preview runs on the composition clock
-  (silences skipped), the waveform timeline on the source clock (silences
-  visible); a tiny worklet maps one to the other on every frame, so the
-  playhead visibly leaps over each cut
-  ([`Timeline.tsx`](https://github.com/mlecoq/react-native-cut-studio/blob/main/src/components/Timeline.tsx)).
-
-## Patterns shared by all eight
+## Patterns shared by all seven
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
