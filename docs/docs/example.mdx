@@ -7,7 +7,7 @@ slug: /example
 
 # Examples
 
-Six complete, tutorial-grade apps built on this library — each one a small,
+Seven complete, tutorial-grade apps built on this library — each one a small,
 documented codebase exercising a different part of the API. They share the
 same stack (Expo, NativeWind, React Native Skia) and the same core idea: one
 worklet renders both the live preview and the export.
@@ -84,10 +84,15 @@ What it demonstrates best:
 - **Audio-only compositions** — the frames extractor drives the clock and
   plays the track; `frames` stays empty
   ([`composition.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/editor/composition.ts)).
-- **Analysis as data, not DSP** — a build-time Node script (FFT included)
-  precomputes bass/mid/high envelopes, spectrum and waveform per frame; the
-  worklet just indexes the JSON
+- **Analysis as data, not DSP** — bass/mid/high envelopes, spectrum and
+  waveform are precomputed per frame; the worklet just indexes the JSON
   ([`scripts/analyze-track.mjs`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/scripts/analyze-track.mjs)).
+- **Your own music, analyzed on-device** — pick any audio file:
+  [react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)
+  decodes it to PCM and the exact same FFT pass runs on the phone, yielding
+  to the UI under a progress bar — the visualizer can't tell a picked song
+  from a bundled one
+  ([`analyzeTrack.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/audio/analyzeTrack.ts)).
 - **Audio bands as shader uniforms** — the Nebula scene is a full-screen
   SkSL shader whose warp deepens with the bass
   ([`scenes.ts`](https://github.com/mlecoq/react-native-music-visualizer/blob/main/src/visualizer/scenes.ts)).
@@ -177,7 +182,48 @@ What it demonstrates best:
   each face
   ([`drawFrame.ts`](https://github.com/mlecoq/react-native-privacy-studio/blob/main/src/editor/drawFrame.ts)).
 
-## Patterns shared by all six
+## Reframe Studio — landscape interviews into vertical shorts
+
+<p align="center">
+  <img src="/react-native-skia-video/img/reframe-studio.gif" width="240" alt="Reframe Studio demo" style={{ borderRadius: 16 }} />
+</p>
+
+[**mlecoq/react-native-reframe-studio**](https://github.com/mlecoq/react-native-reframe-studio)
+— picks a moment out of a long landscape video, follows the speakers with a
+virtual camera, transcribes the clip with Whisper **on the device** and
+exports a captioned 9:16 short. It puts the face detection of Privacy
+Studio and the caption engine of Caption Studio behind one pipeline.
+
+What it demonstrates best:
+
+- **Trimming is free** — `startTime` on the composition item tells the
+  decoder where to begin, so a three-hour podcast costs exactly what a
+  30-second clip costs. Picking the moment *before* analyzing is what keeps
+  the on-device face pass — and the Whisper pass — proportional to the clip
+  you keep
+  ([`composition.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/composition.ts)).
+- **A picker that listens** — the audio track is decoded to a plain loudness
+  envelope ([react-native-audio-api](https://github.com/software-mansion/react-native-audio-api)):
+  waveform under the filmstrip, released handles snap to the nearest pause
+  so a clip never starts mid-word, and the most talkative windows are
+  offered as one-tap suggested moments
+  ([`moments.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/moments.ts)).
+- **True auto-captions** — whisper.cpp transcribes the segment on the phone;
+  token timestamps are glued back into words and grouped into caption-sized
+  phrases, all pure functions
+  ([`transcribe.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/captions/transcribe.ts)).
+- **A camera path, not camera math** — dead zone, eased follow with a speed
+  cap, cuts (never pans) when focus moves to another person, a statue filter
+  for face-shaped things that never move: decisions that read better as a JS
+  loop run once after the analysis. The worklet only interpolates the
+  result, and never across a cut
+  ([`camera.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/camera.ts)).
+- **Two spaces that never meet** — the camera works in source space, the
+  captions in output space, drawn after the crop transform is restored; the
+  caption engine doesn't even know the video was cropped
+  ([`drawFrame.ts`](https://github.com/mlecoq/react-native-reframe-studio/blob/main/src/editor/drawFrame.ts)).
+
+## Patterns shared by all seven
 
 - **One worklet for preview and export** — what you see is exactly what you
   save; there is no second rendering path to keep in sync.
