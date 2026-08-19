@@ -1,11 +1,7 @@
-const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const path = require('path');
-const escape = require('escape-string-regexp');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
-const pak = require('../package.json');
+const { getDefaultConfig } = require('@react-native/metro-config');
 
 const root = path.resolve(__dirname, '..');
-const modules = Object.keys({ ...pak.peerDependencies });
 
 /**
  * Metro configuration
@@ -13,33 +9,15 @@ const modules = Object.keys({ ...pak.peerDependencies });
  *
  * @type {import('metro-config').MetroConfig}
  */
-const config = {
-  watchFolders: [root],
-
-  // We need to make sure that only one version is loaded for peerDependencies
-  // So we block them at the root, and alias them to the versions in example's node_modules
-  resolver: {
-    blacklistRE: exclusionList(
-      modules.map(
-        (m) =>
-          new RegExp(`^${escape(path.join(root, 'node_modules', m))}\\/.*$`)
-      )
-    ),
-
-    extraNodeModules: modules.reduce((acc, name) => {
-      acc[name] = path.join(__dirname, 'node_modules', name);
-      return acc;
-    }, {}),
-  },
-
-  transformer: {
-    getTransformOptions: async () => ({
-      transform: {
-        experimentalImportSupport: false,
-        inlineRequires: true,
-      },
-    }),
-  },
-};
-
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = (async () => {
+  // react-native-monorepo-config is ESM-only; require() of an ES module is
+  // only supported from Node 20.19/22.12, so load it with a dynamic import
+  // to keep this config working on any Node version (metro awaits promise
+  // exports).
+  const { withMetroConfig } = await import('react-native-monorepo-config');
+  return withMetroConfig(getDefaultConfig(__dirname), {
+    root,
+    dirname: __dirname,
+    conditions: ['azzapp-react-native-skia-video-source'],
+  });
+})();

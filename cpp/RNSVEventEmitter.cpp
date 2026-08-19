@@ -1,4 +1,4 @@
-#include "EventEmitter.h"
+#include "RNSVEventEmitter.h"
 
 namespace RNSkiaVideo {
 

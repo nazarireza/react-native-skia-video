@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EventEmitter.h"
+#include "RNSVEventEmitter.h"
 #include "RNSVVideoPlayer.h"
 #include "VideoFrame.h"
 

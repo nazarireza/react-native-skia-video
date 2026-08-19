@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import pexelsClient from './helpers/pexelsClient';
 import type { Video } from 'pexels';
 import {
@@ -13,6 +13,7 @@ import {
   Text,
   Platform,
   Alert,
+  Switch,
 } from 'react-native';
 import {
   createNativeStackNavigator,
@@ -38,6 +39,14 @@ import {
   type SkImage,
 } from '@shopify/react-native-skia';
 import { createId } from '@paralleldrive/cuid2';
+import Slider from '@react-native-community/slider';
+import Animated, {
+  useAnimatedProps,
+  useFrameCallback,
+  useSharedValue,
+} from 'react-native-reanimated';
+
+const AnimatedSlider = Animated.createAnimatedComponent(Slider);
 
 type StackParamList = {
   SelectVideos: undefined;
@@ -158,6 +167,9 @@ const PexelsVideoPicker = ({
   );
 };
 
+const MUSIC_URL =
+  'https://archive.org/download/OpenGoldbergVariations/Kimiko%20Ishizaka%20-%20J.S.%20Bach-%20-Open-%20Goldberg%20Variations%2C%20BWV%20988%20%28Piano%29%20-%2001%20Aria.mp3';
+
 const drawFrame: FrameDrawer = ({
   videoComposition,
   canvas,
@@ -169,6 +181,7 @@ const drawFrame: FrameDrawer = ({
   'worklet';
   const items = videoComposition.items.filter(
     (item) =>
+      item.kind !== 'audio' &&
       item.compositionStartTime <= currentTime &&
       item.compositionStartTime + item.duration >= currentTime
   );
@@ -177,6 +190,10 @@ const drawFrame: FrameDrawer = ({
 
   const durationMS = videoComposition.duration;
 
+  // A single SkImage recycled (outputImage) for every item of the tick:
+  // drawImageRect captures the underlying Skia image synchronously, so the
+  // wrapper can be safely rebound to the next item's texture.
+  let reusableImage: SkImage | undefined;
   for (const item of items) {
     const frame = frames[item.id];
     if (!frame) {
@@ -198,8 +215,11 @@ const drawFrame: FrameDrawer = ({
       image = Skia.Image.MakeImageFromNativeTextureUnstable(
         frame.texture,
         frame.width,
-        frame.height
+        frame.height,
+        false,
+        reusableImage
       );
+      reusableImage = image;
     } catch (error) {
       console.log('error', error);
       continue;
@@ -233,13 +253,24 @@ const VideoCompositionPreview = ({
     params: { videos },
   },
 }: NativeStackScreenProps<StackParamList, 'PreviewComposition'>) => {
-  const [videoComposition, setVideoComposition] =
+  const [baseComposition, setBaseComposition] =
     useState<VideoComposition | null>(null);
+  const [musicPath, setMusicPath] = useState<string | null>(null);
+  const [musicEnabled, setMusicEnabled] = useState(true);
 
   useEffect(() => {
     const promises: StatefulPromise<any>[] = [];
 
     const fetchFiles = async () => {
+      const musicFilePath = `${ReactNativeBlobUtil.fs.dirs.CacheDir}/open-goldberg-aria.mp3`;
+      let musicPromise: StatefulPromise<FetchBlobResponse> | null = null;
+      if (!(await ReactNativeBlobUtil.fs.exists(musicFilePath))) {
+        musicPromise = ReactNativeBlobUtil.config({
+          path: musicFilePath,
+        }).fetch('GET', MUSIC_URL);
+        promises.push(musicPromise);
+      }
+
       const videoUrls: Record<number, StatefulPromise<FetchBlobResponse>> = {};
       for (const video of videos) {
         const uri =
@@ -261,8 +292,13 @@ const VideoCompositionPreview = ({
         videoFiles = await Promise.all(
           Object.entries(videoUrls).map(async ([id, promise]) => {
             const response = await promise;
-            const path = response.path();
-            return { id: Number(id), path };
+            const status = response.info().status;
+            if (status !== 200) {
+              throw new Error(
+                `Could not download video ${id} (status ${status})`
+              );
+            }
+            return { id: Number(id), path: response.path() };
           })
         );
       } catch (error) {
@@ -270,6 +306,23 @@ const VideoCompositionPreview = ({
           console.error(error);
         }
         return;
+      }
+      try {
+        if (musicPromise != null) {
+          const musicResponse = await musicPromise;
+          const status = musicResponse.info().status;
+          if (status !== 200) {
+            throw new Error(
+              `Could not download the background music (status ${status})`
+            );
+          }
+        }
+        setMusicPath(musicFilePath);
+      } catch (error) {
+        await ReactNativeBlobUtil.fs.unlink(musicFilePath).catch(() => {});
+        if (!(error instanceof ReactNativeBlobUtil.CanceledFetchError)) {
+          console.error(error);
+        }
       }
       const videoWithFiles = videos
         .map((video) => ({
@@ -292,12 +345,13 @@ const VideoCompositionPreview = ({
             startTime: 0,
             compositionStartTime: currentTime,
             duration,
+            audio: true,
           };
           currentTime += duration - 1;
           return item;
         }),
       };
-      setVideoComposition(composition);
+      setBaseComposition(composition);
     };
 
     fetchFiles();
@@ -309,15 +363,44 @@ const VideoCompositionPreview = ({
     };
   }, [videos]);
 
+  const videoComposition = useMemo<VideoComposition | null>(() => {
+    if (!baseComposition) {
+      return null;
+    }
+    if (!musicEnabled || !musicPath) {
+      return baseComposition;
+    }
+    return {
+      ...baseComposition,
+      items: [
+        ...baseComposition.items,
+        {
+          id: 'music',
+          kind: 'audio',
+          path: musicPath,
+          compositionStartTime: 0,
+          startTime: 0,
+          duration: baseComposition.duration,
+          volume: 0.3,
+        },
+      ],
+    };
+  }, [baseComposition, musicEnabled, musicPath]);
+
   const [exporting, setExporting] = useState(false);
   const [exportedPath, setExportedPath] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState(0);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const exportCurrentComposition = useCallback(() => {
     if (!videoComposition) {
       return;
     }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     setExporting(true);
+    setExportProgress(0);
 
     // We need to wait a bit to let the UI unmount the player
     // before starting the export, especially on Android where
@@ -352,17 +435,22 @@ const VideoCompositionPreview = ({
       exportVideoComposition({
         videoComposition,
         drawFrame,
+        abortSignal: abortController.signal,
         onProgress: (progress) =>
           setExportProgress(progress.framesCompleted / progress.nbFrames),
         outPath,
         ...encoderConfigs,
       }).then(
         () => {
+          abortControllerRef.current = null;
           setExportedPath(outPath);
         },
         (error) => {
-          Alert.alert('Error exporting video', error.message);
+          abortControllerRef.current = null;
           setExporting(false);
+          if (!abortController.signal.aborted) {
+            Alert.alert('Error exporting video', error.message);
+          }
         }
       );
     }, 100);
@@ -370,14 +458,45 @@ const VideoCompositionPreview = ({
 
   const { width: windowWidth } = useWindowDimensions();
 
-  const { currentFrame } = useVideoCompositionPlayer({
+  const onPlayerError = useCallback((error: any, retry: () => void) => {
+    console.error('Composition player error:', error);
+    Alert.alert('Composition player error', String(error?.message ?? error), [
+      { text: 'Retry', onPress: retry },
+      { text: 'Cancel' },
+    ]);
+  }, []);
+
+  const { currentFrame, player } = useVideoCompositionPlayer({
     composition: exporting ? null : videoComposition,
     autoPlay: true,
     isLooping: true,
     drawFrame,
     width: windowWidth,
     height: windowWidth,
+    onError: onPlayerError,
   });
+
+  const [isPlaying, setIsPlaying] = useState(true);
+  const duration = videoComposition?.duration ?? 0;
+
+  // The composition extractor exposes `currentTime` as a native getter, so it
+  // has to be polled from the UI thread to drive the slider.
+  const currentTime = useSharedValue(0);
+  useFrameCallback(() => {
+    currentTime.value = player?.currentTime ?? 0;
+  }, true);
+
+  const sliderProps = useAnimatedProps(
+    () => ({ value: currentTime.value }),
+    [currentTime]
+  );
+
+  const seekTo = useCallback(
+    (time: number) => {
+      player?.seekTo(time);
+    },
+    [player]
+  );
 
   return (
     <View style={{ flex: 1 }}>
@@ -405,13 +524,65 @@ const VideoCompositionPreview = ({
                 height={windowWidth}
               />
             </Canvas>
-            <View style={{ opacity: videoComposition ? 1 : 0 }}>
-              <Button
-                title="Export"
-                onPress={() => {
-                  exportCurrentComposition();
+            <View
+              style={{
+                opacity: videoComposition ? 1 : 0,
+                alignSelf: 'stretch',
+                gap: 10,
+                alignItems: 'center',
+              }}
+            >
+              <AnimatedSlider
+                animatedProps={sliderProps}
+                minimumValue={0}
+                maximumValue={duration}
+                onValueChange={(value) => {
+                  // Fires continuously on Android, only seek on release there.
+                  if (Platform.OS !== 'android') {
+                    seekTo(value);
+                  }
                 }}
+                onSlidingComplete={(value) => {
+                  if (Platform.OS === 'android') {
+                    seekTo(value);
+                  }
+                }}
+                style={{ alignSelf: 'stretch' }}
+                disabled={!videoComposition}
+                maximumTrackTintColor={'#CCC'}
+                minimumTrackTintColor={'#F00'}
               />
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Text style={{ color: 'black' }}>Background music</Text>
+                <Switch
+                  value={musicEnabled && musicPath != null}
+                  disabled={musicPath == null}
+                  onValueChange={setMusicEnabled}
+                />
+              </View>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Button
+                  title={isPlaying ? 'Pause' : 'Play'}
+                  onPress={() => {
+                    if (isPlaying) {
+                      player?.pause();
+                    } else {
+                      player?.play();
+                    }
+                    setIsPlaying(!isPlaying);
+                  }}
+                />
+                <Button
+                  title="Export"
+                  onPress={() => {
+                    exportCurrentComposition();
+                  }}
+                />
+              </View>
             </View>
           </View>
           {!videoComposition && (
@@ -452,6 +623,10 @@ const VideoCompositionPreview = ({
               <Text style={{ color: 'black' }}>
                 Exporting video {Math.round(exportProgress * 100)}%...
               </Text>
+              <Button
+                title="Cancel"
+                onPress={() => abortControllerRef.current?.abort()}
+              />
             </>
           )}
         </View>

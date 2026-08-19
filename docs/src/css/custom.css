@@ -1,0 +1,43 @@
+/**
+ * Global theme: dark-first, teal accent, in the spirit of the
+ * react-native-skia documentation.
+ */
+
+:root {
+  --ifm-color-primary: #0d9488;
+  --ifm-color-primary-dark: #0c857a;
+  --ifm-color-primary-darker: #0b7d73;
+  --ifm-color-primary-darkest: #09675f;
+  --ifm-color-primary-light: #0ea396;
+  --ifm-color-primary-lighter: #0fab9d;
+  --ifm-color-primary-lightest: #12c1b2;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --ifm-navbar-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #2dd4bf;
+  --ifm-color-primary-dark: #22c2ae;
+  --ifm-color-primary-darker: #1fb7a4;
+  --ifm-color-primary-darkest: #199788;
+  --ifm-color-primary-light: #45d9c6;
+  --ifm-color-primary-lighter: #52dcca;
+  --ifm-color-primary-lightest: #79e3d6;
+  --ifm-background-color: #0a0e14;
+  --ifm-background-surface-color: #141a24;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 255, 255, 0.08);
+  --ifm-navbar-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+[data-theme='dark'] .navbar,
+[data-theme='dark'] .footer--dark {
+  --ifm-navbar-background-color: #0a0e14;
+  --ifm-footer-background-color: #060a10;
+}
+
+/* Rounded, bordered look for tables (API reference) */
+table {
+  display: table;
+  width: 100%;
+}

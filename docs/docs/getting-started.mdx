@@ -1,0 +1,99 @@
+---
+id: getting-started
+title: Getting Started
+sidebar_position: 1
+slug: /getting-started
+---
+
+# Getting Started
+
+**React Native Skia Video** adds video superpowers to
+[React Native Skia](https://shopify.github.io/react-native-skia/): it decodes
+videos straight into **GPU textures** you can draw with the Skia canvas API,
+lets you **compose** multiple videos (and anything Skia can draw) frame by
+frame, and **exports** the result through the platform's hardware encoders —
+with audio mixed in.
+
+It powers the cover editor of [Azzapp](https://azzapp.com), where every cover
+video is composited and encoded on-device with this library.
+
+:::warning Beta
+The library is still in beta. The API is stable in practice but may evolve
+between minor versions.
+:::
+
+## Installation
+
+```sh
+npm install @azzapp/react-native-skia-video
+```
+
+The library relies on the following peer dependencies:
+
+| Package | Version |
+| --- | --- |
+| `@shopify/react-native-skia` | `>= 2.0.0` |
+| `react-native-reanimated` | `>= 4.0.0` |
+| `react-native-worklets` | `>= 0.10.0` |
+
+It ships native code for **iOS** (Metal, AVFoundation) and **Android**
+(OpenGL, MediaCodec). With Expo, use a
+[development build](https://docs.expo.dev/develop/development-builds/introduction/)
+(`npx expo prebuild && npx expo run:ios`) — Expo Go can't load custom native
+modules.
+
+## Three building blocks
+
+### 1. Play a single video
+
+The [`useVideoPlayer`](/docs/video-player) hook decodes a video file and hands
+you its current frame as a Reanimated shared value, ready to be wrapped in an
+`SkImage`:
+
+```tsx
+import { Canvas, Image, Skia } from '@shopify/react-native-skia';
+import { useVideoPlayer } from '@azzapp/react-native-skia-video';
+import { useDerivedValue } from 'react-native-reanimated';
+
+const MyVideoPlayer = ({ uri, width, height }) => {
+  const { currentFrame } = useVideoPlayer({ uri, autoPlay: true });
+
+  const videoImage = useDerivedValue(() => {
+    const frame = currentFrame.value;
+    if (!frame) return null;
+    return Skia.Image.MakeImageFromNativeTextureUnstable(
+      frame.texture,
+      frame.width,
+      frame.height
+    );
+  });
+
+  return (
+    <Canvas style={{ width, height }}>
+      <Image image={videoImage} x={0} y={0} width={width} height={height} fit="cover" />
+    </Canvas>
+  );
+};
+```
+
+### 2. Compose multiple videos
+
+A [`VideoComposition`](/docs/video-composition) describes which media plays
+when; a `drawFrame` worklet receives the decoded frames of every active video
+each vsync and draws the result with the Skia canvas —
+[`useVideoCompositionPlayer`](/docs/video-composition/playback) takes care of
+the rest.
+
+### 3. Export to a file
+
+[`exportVideoComposition`](/docs/video-composition/exporting) replays the
+**same** `drawFrame` worklet on a background thread, feeding each rendered
+frame to the hardware encoder. Preview and export can never drift apart.
+
+## Where to go next
+
+- Follow the [Island Studio walkthrough](/docs/example) — a full video editor
+  (montage, transitions, overlays, music, export) built on this library in
+  ~15 files.
+- Read the [Video Composition concepts](/docs/video-composition).
+- Browse the [API reference](/docs/api).

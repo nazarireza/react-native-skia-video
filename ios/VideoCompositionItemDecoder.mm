@@ -8,14 +8,17 @@
 namespace RNSkiaVideo {
 
 VideoCompositionItemDecoder::VideoCompositionItemDecoder(
-    std::shared_ptr<VideoCompositionItem> item, bool realTime) {
+    std::shared_ptr<VideoCompositionItem> item, bool realTime,
+    AVURLAsset* sharedAsset) {
   this->item = item;
   this->realTime = realTime;
   lock = [[NSObject alloc] init];
   NSString* path =
       [NSString stringWithCString:item->path.c_str()
                          encoding:[NSString defaultCStringEncoding]];
-  asset = [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:path] options:nil];
+  asset = sharedAsset
+              ?: [AVURLAsset URLAssetWithURL:[NSURL fileURLWithPath:path]
+                                     options:nil];
   videoTrack = [[asset tracksWithMediaType:AVMediaTypeVideo] firstObject];
   if (!videoTrack) {
     throw [NSError
@@ -26,6 +29,7 @@ VideoCompositionItemDecoder::VideoCompositionItemDecoder(
                      stringWithFormat:@"No video track for path: %@", path]
                }];
   }
+  segments = videoTrack.segments;
   width = videoTrack.naturalSize.width;
   height = videoTrack.naturalSize.height;
   rotation = AVAssetTrackUtils::GetTrackRotationInDegree(videoTrack);
@@ -83,6 +87,47 @@ void VideoCompositionItemDecoder::setupReader(CMTime initialTime) {
   [assetReader startReading];
 }
 
+// Slow-motion videos (e.g. those recorded by the iPhone camera) store every
+// frame in the short *source* (media) timeline but expose a stretched
+// presentation duration through the track's segment time mappings. The raw
+// AVAssetReaderTrackOutput hands us samples with their source timestamps and
+// ignores those mappings, so we remap each sample into the *target*
+// (presentation) timeline that the composition uses. For regular videos the
+// single segment is an identity mapping and this is a no-op.
+double VideoCompositionItemDecoder::mapSourceTimeToTarget(CMTime sourceTime) {
+  if (segments == nil || segments.count == 0) {
+    return CMTimeGetSeconds(sourceTime);
+  }
+  AVAssetTrackSegment* matching = nil;
+  for (AVAssetTrackSegment* segment in segments) {
+    if (segment.empty) {
+      continue;
+    }
+    CMTimeRange source = segment.timeMapping.source;
+    if (!CMTIMERANGE_IS_VALID(source) || source.duration.value == 0) {
+      continue;
+    }
+    if (CMTimeCompare(sourceTime, source.start) >= 0) {
+      // Keep the latest segment starting at or before the sample so that
+      // samples falling past a segment's end extrapolate from the nearest
+      // mapping instead of desyncing back to an identity timeline.
+      matching = segment;
+      if (CMTimeCompare(sourceTime, CMTimeRangeGetEnd(source)) < 0) {
+        break;
+      }
+    } else if (matching == nil) {
+      matching = segment;
+      break;
+    }
+  }
+  if (matching == nil) {
+    return CMTimeGetSeconds(sourceTime);
+  }
+  CMTime target = CMTimeMapTimeFromRangeToRange(
+      sourceTime, matching.timeMapping.source, matching.timeMapping.target);
+  return CMTimeGetSeconds(target);
+}
+
 #define DECODER_INPUT_TIME_ADVANCE 0.1
 
 void VideoCompositionItemDecoder::advanceDecoder(CMTime currentTime) {
@@ -133,15 +178,15 @@ void VideoCompositionItemDecoder::advanceDecoder(CMTime currentTime) {
         continue;
       }
       auto timeStamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+      double targetSeconds = this->mapSourceTimeToTarget(timeStamp);
       auto buffer = CMSampleBufferGetImageBuffer(sampleBuffer);
       if (buffer) {
-        framesQueue->push_back(
-            std::make_pair(CMTimeGetSeconds(timeStamp), sampleBuffer));
+        framesQueue->push_back(std::make_pair(targetSeconds, sampleBuffer));
       } else {
         CFRelease(sampleBuffer);
       }
 
-      latestSampleTime = timeStamp;
+      latestSampleTime = CMTimeMakeWithSeconds(targetSeconds, NSEC_PER_SEC);
     }
   }
 }
@@ -213,8 +258,14 @@ void VideoCompositionItemDecoder::release() {
     nextLoopFrames.clear();
     hasLooped = false;
     lastRequestedTime = kCMTimeInvalid;
-    [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
     currentFrame = nullptr;
+  }
+  [MTLTextureUtils flushTextureCache];
+}
+
+VideoCompositionItemDecoder::~VideoCompositionItemDecoder() {
+  @synchronized(lock) {
+    [mtlTexture setPurgeableState:MTLPurgeableStateEmpty];
     mtlTexture = nil;
   }
 }

@@ -1,0 +1,84 @@
+---
+id: audio
+title: Audio
+sidebar_position: 3
+---
+
+# Audio
+
+Compositions handle audio in two ways: the sound of the video items
+themselves, and standalone audio items (music, voice-over). In both cases the
+audio plays **in sync during preview** and is **mixed into an AAC track on
+export** — you never have to touch audio buffers yourself.
+
+## Video item audio
+
+Video items are silent by default. Set `audio` to also play the file's own
+audio track, following the same time mapping as its frames:
+
+```ts
+const composition = {
+  duration: 10,
+  items: [
+    {
+      id: 'clip',
+      path: 'path/to/video.mp4',
+      compositionStartTime: 0,
+      startTime: 0,
+      duration: 10,
+      audio: { volume: 0.8 }, // or simply `audio: true`
+    },
+  ],
+};
+```
+
+## Audio items
+
+An item with `kind: 'audio'` contributes only sound. The source can be an
+audio file **or any video file** (its audio track is used). Audio items never
+appear in the `frames` map passed to `drawFrame`.
+
+```ts
+{
+  id: 'music',
+  kind: 'audio',
+  path: 'path/to/music.m4a',
+  compositionStartTime: 0, // when it starts on the timeline
+  startTime: 12,           // offset inside the source file
+  duration: 10,
+  volume: 0.3,             // 0..1, defaults to 1
+}
+```
+
+Overlapping audio (a video's soundtrack + background music, several music
+items…) is mixed together.
+
+## Looping a track over the composition
+
+Audio items don't loop by themselves. To cover a montage longer than the
+track, chain as many copies as needed:
+
+```ts
+for (let time = 0, i = 0; time < duration; time += track.duration, i++) {
+  items.push({
+    kind: 'audio',
+    id: `music-${i}`,
+    path: track.path,
+    compositionStartTime: time,
+    startTime: 0,
+    duration: Math.min(track.duration, duration - time),
+    volume: 0.8,
+  });
+}
+```
+
+## Export settings
+
+When the composition contains audio, the exported file gets an AAC track,
+configurable through the [export options](/docs/video-composition/exporting):
+
+| Option | Default | |
+| --- | --- | --- |
+| `audioBitRate` | `128000` | Bit rate in bits per second. |
+| `audioSampleRate` | `44100` | Sample rate in Hz. |
+| `audioChannelCount` | `2` | 1 = mono, 2 = stereo. |

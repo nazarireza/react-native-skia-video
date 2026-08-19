@@ -1,0 +1,102 @@
+.hero {
+  padding: 5rem 1rem 4rem;
+  text-align: center;
+  background: linear-gradient(180deg, #0a0e14 0%, #10202c 100%);
+  color: #f3f6fa;
+}
+
+.heroTitle {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.heroTitle span {
+  color: #2dd4bf;
+}
+
+.heroSubtitle {
+  font-size: 1.25rem;
+  color: #a8b3c4;
+  max-width: 640px;
+  margin: 1rem auto 2rem;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Outline button on the dark hero, readable in both color modes */
+.heroGhostButton {
+  color: #f3f6fa;
+  border-color: #f3f6fa;
+}
+
+.heroGhostButton:hover {
+  color: #0a0e14;
+  background: #f3f6fa;
+  border-color: #f3f6fa;
+}
+
+.section {
+  padding: 4rem 1rem;
+}
+
+.sectionAlt {
+  composes: section;
+  background: var(--ifm-background-surface-color);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.feature {
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.feature h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.feature p {
+  margin: 0;
+  color: var(--ifm-color-emphasis-700);
+  font-size: 0.95rem;
+}
+
+.demo {
+  display: flex;
+  gap: 3rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.demo img {
+  width: 260px;
+  border-radius: 24px;
+  border: 1px solid var(--ifm-toc-border-color);
+}
+
+.demoText {
+  max-width: 480px;
+}
+
+.codeExample {
+  max-width: 860px;
+  margin: 0 auto;
+  text-align: left;
+}

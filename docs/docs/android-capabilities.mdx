@@ -1,0 +1,59 @@
+---
+id: android-capabilities
+title: Android Capabilities
+sidebar_position: 4
+slug: /android-capabilities
+---
+
+# Android Capabilities
+
+Android devices vary a lot in what their hardware codecs can do — maximum
+resolution, number of simultaneous decoder instances, supported encoder
+configurations. Two Android-only helpers let you adapt before decoding or
+exporting. Both throw if called on iOS (where AVFoundation negotiates
+configurations by itself).
+
+## getDecodingCapabilitiesFor
+
+```ts
+import { getDecodingCapabilitiesFor } from '@azzapp/react-native-skia-video';
+
+const capabilities = getDecodingCapabilitiesFor('video/avc');
+// { maxInstances: 16, maxWidth: 3840, maxHeight: 2176 } | null
+```
+
+Returns the decoding limits for a mime type (most of the time you'll check
+`video/avc`):
+
+| Field | Description |
+| --- | --- |
+| `maxInstances` | How many decoders can run at once — caps how many video items can overlap in a composition. |
+| `maxWidth` / `maxHeight` | Maximum decodable frame size — cap your items' `resolution` accordingly. |
+
+## getValidEncoderConfigurations
+
+```ts
+import { getValidEncoderConfigurations } from '@azzapp/react-native-skia-video';
+
+const configs = getValidEncoderConfigurations(1080, 1920, 60, 10_000_000);
+const best = configs?.[0];
+
+await exportVideoComposition({
+  // …
+  width: best.width,
+  height: best.height,
+  frameRate: best.frameRate,
+  bitRate: best.bitRate,
+  encoderName: best.encoderName,
+});
+```
+
+Given your target export settings, returns the closest configurations the
+device's encoders actually support — lowering resolution, frame rate or bit
+rate if needed while keeping the aspect ratio. Each entry contains:
+
+| Field | Description |
+| --- | --- |
+| `encoderName` | Pass it to `exportVideoComposition` to pin this encoder. |
+| `hardwareAccelerated` | Prefer entries where this is `true`. |
+| `width` / `height` / `frameRate` / `bitRate` | The adjusted, supported values. |

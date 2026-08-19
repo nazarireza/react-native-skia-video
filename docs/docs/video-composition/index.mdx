@@ -1,0 +1,115 @@
+---
+id: index
+title: Concepts
+sidebar_position: 1
+slug: /video-composition
+---
+
+# Video Composition
+
+A **composition** is the unit of work of this library: a set of media items
+on a shared timeline, plus a `drawFrame` function that turns their decoded
+frames into the final picture. The same composition previews on screen and
+exports to a file.
+
+## The composition object
+
+```ts
+import type { VideoComposition } from '@azzapp/react-native-skia-video';
+
+const composition: VideoComposition = {
+  duration: 10, // seconds
+  items: [
+    {
+      id: 'clipA',
+      path: '/local/path/to/video.mp4',
+      compositionStartTime: 0, // when the item enters the timeline
+      startTime: 0,            // offset inside the source file
+      duration: 5,
+    },
+    {
+      id: 'clipB',
+      path: '/local/path/to/video2.mp4',
+      compositionStartTime: 5,
+      startTime: 5,
+      duration: 5,
+    },
+  ],
+};
+```
+
+Every item plays the `[startTime, startTime + duration]` range of its source
+file, starting at `compositionStartTime` on the composition timeline. Items
+may **overlap** — that's how you build transitions, picture-in-picture or
+multi-layer edits: during the overlap, `drawFrame` receives the frames of all
+active items.
+
+There are two kinds of items:
+
+- **Video items** (`kind: 'video'`, the default) produce frames for
+  `drawFrame`. They are silent unless you set their [`audio`](/docs/video-composition/audio)
+  option. An optional `resolution` downscales decoding for performance.
+- **Audio items** (`kind: 'audio'`) never produce frames; their audio track
+  plays during preview and is mixed into the export. See
+  [Audio](/docs/video-composition/audio).
+
+:::info Local files only
+`path` must point to a local file (no scheme — strip any `file://` prefix).
+Download or copy remote media before adding it to a composition.
+:::
+
+## The drawFrame worklet
+
+`drawFrame` is called for **every rendered frame** — on the UI thread during
+preview, on a dedicated thread during export. It receives the decoded frames
+of the active video items and a Skia canvas to draw into:
+
+```ts
+import type { FrameDrawer } from '@azzapp/react-native-skia-video';
+import { Skia } from '@shopify/react-native-skia';
+
+const drawFrame: FrameDrawer = ({ canvas, currentTime, frames, width, height }) => {
+  'worklet';
+  const frame = frames[currentTime < 5 ? 'clipA' : 'clipB'];
+  if (!frame) return;
+  const image = Skia.Image.MakeImageFromNativeTextureUnstable(
+    frame.texture,
+    frame.width,
+    frame.height
+  );
+  canvas.drawImageRect(
+    image,
+    Skia.XYWHRect(0, 0, image.width(), image.height()),
+    Skia.XYWHRect(0, 0, width, height),
+    Skia.Paint()
+  );
+  image.dispose();
+};
+```
+
+A few rules of thumb:
+
+- **It must be a worklet** (`'worklet'` directive) and only call
+  worklet-compatible code. Define helper worklets *before* the worklets that
+  call them — closures are captured at the definition site.
+- `frames` maps item ids to `VideoFrame`s (`{ texture, width, height, rotation }`).
+  A frame's `rotation` is the display rotation in degrees of the source
+  (phone footage is often stored rotated).
+- Skia objects can't hop between worklet runtimes. Decode/cache per runtime
+  (e.g. on `globalThis`) anything you create from raw data — images, typefaces,
+  shaders, paragraphs.
+- Anything Skia can draw is fair game: SkSL runtime shaders for transitions,
+  paragraphs for text, image filters, nested clips…
+
+## Preview vs export
+
+| | Preview | Export |
+| --- | --- | --- |
+| Entry point | [`useVideoCompositionPlayer`](/docs/video-composition/playback) | [`exportVideoComposition`](/docs/video-composition/exporting) |
+| Thread | UI thread (every vsync) | Dedicated worklet thread |
+| Decoding | Real-time, dropped frames possible | Synchronous, every frame exact |
+| Output | `SkImage` for a `<Canvas>` | H.264 file via hardware encoder |
+| Audio | Played through the speakers | Mixed and encoded as AAC |
+
+Because both sides run the exact same `drawFrame`, the preview *is* the
+export. This is the core design idea of the library.

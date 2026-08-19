@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EventEmitter.h"
+#include "RNSVEventEmitter.h"
 #include <fbjni/fbjni.h>
 #include <jsi/jsi.h>
 

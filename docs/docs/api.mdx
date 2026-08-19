@@ -1,0 +1,117 @@
+---
+id: api
+title: API Reference
+sidebar_position: 6
+slug: /api
+---
+
+# API Reference
+
+All exports of `@azzapp/react-native-skia-video`. Guides:
+[Video Player](/docs/video-player) ·
+[Video Composition](/docs/video-composition) ·
+[Playback](/docs/video-composition/playback) ·
+[Audio](/docs/video-composition/audio) ·
+[Exporting](/docs/video-composition/exporting) ·
+[Android Capabilities](/docs/android-capabilities).
+
+## Hooks & functions
+
+| Export | Description |
+| --- | --- |
+| `useVideoPlayer(options)` | Plays a single video; returns `{ currentFrame, player }`. |
+| `useVideoCompositionPlayer(options)` | Plays a composition through a `drawFrame` worklet; returns `{ currentFrame, player }`. |
+| `exportVideoComposition(options)` | Renders a composition to an H.264 file (AAC audio when present); returns a `Promise<void>`. |
+| `getDecodingCapabilitiesFor(mimetype)` | Android: decoder limits for a mime type. |
+| `getValidEncoderConfigurations(width, height, frameRate, bitRate)` | Android: closest supported encoder configurations. |
+
+## VideoComposition
+
+```ts
+type VideoComposition = {
+  duration: number; // seconds
+  items: VideoCompositionItem[];
+};
+
+type VideoCompositionItem = VideoCompositionVideoItem | VideoCompositionAudioItem;
+```
+
+### Common item fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `string` | Unique id; keys the `frames` map for video items. |
+| `path` | `string` | Local file path (no `file://` scheme). |
+| `compositionStartTime` | `number` | Start on the composition timeline, seconds. |
+| `startTime` | `number` | Offset inside the source file, seconds. |
+| `duration` | `number` | Item duration, seconds. |
+
+### VideoCompositionVideoItem
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `kind` | `'video'` (default) | Produces frames for `drawFrame`. |
+| `resolution` | `{ width, height }?` | Decode at this resolution (downscaling improves performance). |
+| `audio` | `boolean \| { volume?: number }` | Also play/mix the file's audio track. Defaults to `false`. |
+
+### VideoCompositionAudioItem
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `kind` | `'audio'` | Sound only — never appears in `frames`. Source can be an audio or video file. |
+| `volume` | `number?` | 0–1, defaults to 1. |
+
+## FrameDrawer
+
+```ts
+type FrameDrawer<T = undefined> = (args: {
+  context: T; // from beforeDrawFrame
+  canvas: SkCanvas;
+  videoComposition: VideoComposition;
+  currentTime: number; // seconds
+  frames: Record<string, VideoFrame>; // active video items only
+  width: number;
+  height: number;
+}) => void;
+```
+
+## VideoFrame
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `texture` | `unknown` | Native GPU texture — wrap with `Skia.Image.MakeImageFromNativeTextureUnstable(texture, width, height)`. |
+| `width` / `height` | `number` | Frame size in pixels, as stored. |
+| `rotation` | `number` | Display rotation in degrees (0, 90, 180, 270). |
+
+## VideoPlayer
+
+Returned by `useVideoPlayer` (full interface; the hook's `player` exposes the
+playback subset).
+
+| Member | Description |
+| --- | --- |
+| `play()` / `pause()` | Control playback. |
+| `seekTo(seconds)` | Seek; emits `seekComplete`. |
+| `decodeNextFrame()` | UI-thread only: decode and return the next `VideoFrame`. |
+| `currentTime` / `duration` | Seconds, read-only. |
+| `isPlaying` / `isLooping` | Playback state. |
+| `volume` / `playbackSpeed` | Audio volume (0–1) and speed (1 = normal). |
+| `on(event, listener)` | `ready`, `bufferingStart`, `bufferingEnd`, `bufferingUpdate`, `complete`, `seekComplete`, `playingStatusChange`, `error`. Returns an unsubscribe function. |
+| `dispose()` | Release the player. |
+
+## ExportOptions
+
+| Field | Type | Default | Description |
+| --- | --- | --- | --- |
+| `outPath` | `string` | — | Destination file path. |
+| `width` / `height` | `number` | — | Output resolution in pixels. |
+| `frameRate` | `number` | — | Frames per second. |
+| `bitRate` | `number` | — | Video bit rate, bits per second. |
+| `encoderName` | `string?` | auto | Android: encoder to use (see `getValidEncoderConfigurations`). |
+| `audioBitRate` | `number?` | `128000` | AAC bit rate (compositions with audio). |
+| `audioSampleRate` | `number?` | `44100` | AAC sample rate. |
+| `audioChannelCount` | `number?` | `2` | 1 = mono, 2 = stereo. |
+
+`exportVideoComposition` additionally accepts `drawFrame`,
+`beforeDrawFrame` / `afterDrawFrame`, `onProgress({ framesCompleted, nbFrames })`
+and `abortSignal`.
