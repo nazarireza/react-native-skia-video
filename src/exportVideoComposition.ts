@@ -207,7 +207,7 @@ export const exportVideoComposition = async <T = undefined>({
               // Synchronous flush: block until the GPU is done rendering the
               // frame, since the encoder reads the surface's texture from its
               // own command queue / GL context.
-              currentSurface.flush(true);
+              currentSurface.flush();
               const texture = currentSurface.getNativeTextureUnstable();
               currentEncoder.encodeFrame(texture, currentTime);
               afterDrawFrame?.(context);

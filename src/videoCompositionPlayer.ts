@@ -196,8 +196,7 @@ export const useVideoCompositionPlayer = ({
         surface.getNativeTextureUnstable(),
         width * pixelRatio,
         height * pixelRatio,
-        false,
-        previousFrame ?? undefined
+        false
       );
       if (nextFrame === previousFrame) {
         // The recycled image keeps the same identity, so listeners (the Skia
