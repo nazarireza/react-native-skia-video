@@ -148,6 +148,12 @@ export const exportVideoComposition = async <T = undefined>({
             if (!surface) {
               throw new Error('Failed to create Skia surface');
             }
+          
+            // Force the GPU to allocate and synchronize the texture 
+            // before the video encoder reads the very first frame.
+            surface.getCanvas().drawColor(Skia.Color('#00000000'), BlendMode.Clear);
+            surface.flush();
+          
             cache.__rnskvExportSurface = surface;
             cache.__rnskvExportSurfaceWidth = width;
             cache.__rnskvExportSurfaceHeight = height;
