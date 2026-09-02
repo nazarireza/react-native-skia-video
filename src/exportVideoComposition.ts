@@ -185,11 +185,11 @@ export const exportVideoComposition = async <T = undefined>({
           const currentSurface = surface;
           const currentExtractor = frameExtractor;
           const currentEncoder = encoder;
-          for (let i = 0; i < nbFrames; i++) {
+          for (let i = -30; i < nbFrames; i++) {
             if (cancelledSynchronizable.getDirty()) {
               return;
             }
-            const currentTime = i / options.frameRate;
+            const currentTime = Math.max(0, i / options.frameRate);
             runPooled(() => {
               const frames =
                 currentExtractor.decodeCompositionFrames(currentTime);
@@ -209,7 +209,7 @@ export const exportVideoComposition = async <T = undefined>({
               // own command queue / GL context.
               currentSurface.flush();
               const texture = currentSurface.getNativeTextureUnstable();
-              currentEncoder.encodeFrame(texture, currentTime);
+              if (i >= 0) currentEncoder.encodeFrame(texture, currentTime);
               afterDrawFrame?.(context);
               if (onProgress) {
                 scheduleOnRN(onProgress, {
