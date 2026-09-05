@@ -66,7 +66,12 @@ void VideoCompositionItemDecoder::setupReader(CMTime initialTime) {
   NSDictionary* pixBuffAttributes = @{
     (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
     (id)kCVPixelBufferIOSurfacePropertiesKey : @{},
-    (id)kCVPixelBufferMetalCompatibilityKey : @YES
+    (id)kCVPixelBufferMetalCompatibilityKey : @YES,
+    AVVideoColorPropertiesKey: @{
+        AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+        AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+        AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
+    }
   };
   CGSize resolution = item->resolution;
   if (resolution.width > 0 && resolution.height > 0) {
@@ -228,6 +233,11 @@ VideoCompositionItemDecoder::acquireFrameForTime(CMTime currentTime,
   }
   if (nextFrame) {
     CVPixelBufferRef buffer = CMSampleBufferGetImageBuffer(nextFrame);
+    
+    CVBufferSetAttachment(buffer, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+    CVBufferSetAttachment(buffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+    CVBufferSetAttachment(buffer, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+
     [MTLTextureUtils updateTexture:mtlTexture with:buffer];
     CFRelease(nextFrame);
     return std::make_shared<VideoFrame>(mtlTexture, width, height, rotation);
