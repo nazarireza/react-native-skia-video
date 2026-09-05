@@ -63,24 +63,45 @@ void VideoCompositionItemDecoder::setupReader(CMTime initialTime) {
       CMTimeSubtract(CMTimeMakeWithSeconds(item->duration, NSEC_PER_SEC),
                      position));
 
-  NSDictionary* pixBuffAttributes = @{
+  // 1. Detect if the video is HDR
+  bool isHDR = false;
+  if (@available(iOS 14.0, macOS 11.0, *)) {
+    isHDR = [videoTrack hasMediaCharacteristic:AVMediaCharacteristicContainsHDRVideo];
+  } else {
+    NSArray *formatDescriptions = videoTrack.formatDescriptions;
+    for (id desc in formatDescriptions) {
+      CMFormatDescriptionRef formatDesc = (__bridge CMFormatDescriptionRef)desc;
+      CFStringRef transferFunc = (CFStringRef)CMFormatDescriptionGetExtension(formatDesc, kCVImageBufferTransferFunctionKey);
+      if (transferFunc) {
+        if (CFStringCompare(transferFunc, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, 0) == kCFCompareEqualTo ||
+            CFStringCompare(transferFunc, kCVImageBufferTransferFunction_ITU_R_2100_HLG, 0) == kCFCompareEqualTo) {
+          isHDR = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // 2. Base Pixel Buffer Attributes
+  NSMutableDictionary* pixBuffAttributes = [NSMutableDictionary dictionaryWithDictionary:@{
     (id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
     (id)kCVPixelBufferIOSurfacePropertiesKey : @{},
-    (id)kCVPixelBufferMetalCompatibilityKey : @YES,
-    AVVideoColorPropertiesKey: @{
+    (id)kCVPixelBufferMetalCompatibilityKey : @YES
+  }];
+  
+  // 3. If HDR, enforce AVFoundation Tone-Mapping to SDR (Rec.709)
+  if (isHDR) {
+    pixBuffAttributes[AVVideoColorPropertiesKey] = @{
         AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
         AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
         AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2
-    }
-  };
+    };
+  }
+
   CGSize resolution = item->resolution;
   if (resolution.width > 0 && resolution.height > 0) {
-    pixBuffAttributes =
-        [NSMutableDictionary dictionaryWithDictionary:pixBuffAttributes];
-    [pixBuffAttributes setValue:@(resolution.width)
-                         forKey:(id)kCVPixelBufferWidthKey];
-    [pixBuffAttributes setValue:@(resolution.height)
-                         forKey:(id)kCVPixelBufferHeightKey];
+    [pixBuffAttributes setValue:@(resolution.width) forKey:(id)kCVPixelBufferWidthKey];
+    [pixBuffAttributes setValue:@(resolution.height) forKey:(id)kCVPixelBufferHeightKey];
     width = resolution.width;
     height = resolution.height;
   }
@@ -231,12 +252,21 @@ VideoCompositionItemDecoder::acquireFrameForTime(CMTime currentTime,
       break;
     }
   }
+  
   if (nextFrame) {
     CVPixelBufferRef buffer = CMSampleBufferGetImageBuffer(nextFrame);
     
-    CVBufferSetAttachment(buffer, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
-    CVBufferSetAttachment(buffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
-    CVBufferSetAttachment(buffer, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+    // Check if the buffer's color space needs correcting 
+    // (If AVFoundation tone-mapped it from HDR, we ensure the metadata accurately reflects SDR Rec. 709)
+    CFStringRef transferFunc = (CFStringRef)CVBufferGetAttachment(buffer, kCVImageBufferTransferFunctionKey, NULL);
+    if (transferFunc == NULL || 
+        CFStringCompare(transferFunc, kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ, 0) == kCFCompareEqualTo ||
+        CFStringCompare(transferFunc, kCVImageBufferTransferFunction_ITU_R_2100_HLG, 0) == kCFCompareEqualTo) {
+        
+        CVBufferSetAttachment(buffer, kCVImageBufferColorPrimariesKey, kCVImageBufferColorPrimaries_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+        CVBufferSetAttachment(buffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+        CVBufferSetAttachment(buffer, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, kCVAttachmentMode_ShouldPropagate);
+    }
 
     [MTLTextureUtils updateTexture:mtlTexture with:buffer];
     CFRelease(nextFrame);
