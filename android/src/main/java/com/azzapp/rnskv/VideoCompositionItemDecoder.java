@@ -3,6 +3,7 @@ package com.azzapp.rnskv;
 import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
@@ -46,6 +47,8 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
 
   private boolean released = false;
 
+  private boolean forceSdrOutput = true;
+
   private Surface surface;
 
   private final Stack<Frame> freeFrames = new Stack<>();
@@ -68,6 +71,28 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
   }
 
   /**
+   * Enable or disable forcing HDR to SDR tone mapping.
+   *
+   * @param forceSdrOutput true to request SDR output for HDR sources (default: true)
+   */
+  public void setForceSdrOutput(boolean forceSdrOutput) {
+    this.forceSdrOutput = forceSdrOutput;
+  }
+
+  /**
+   * Check if the loaded video format contains HDR color transfer attributes (HLG or PQ).
+   *
+   * @return true if the media format is HDR
+   */
+  public boolean isHdr() {
+    if (format == null || !format.containsKey(MediaFormat.KEY_COLOR_TRANSFER)) {
+      return false;
+    }
+    int transfer = format.getInteger(MediaFormat.KEY_COLOR_TRANSFER);
+    return transfer == MediaFormat.COLOR_TRANSFER_HLG || transfer == MediaFormat.COLOR_TRANSFER_ST2084;
+  }
+
+  /**
    * Prepare the decoder.
    *
    * @throws IOException if the decoder cannot be prepared
@@ -83,6 +108,12 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
       throw new RuntimeException("No video track");
     }
     format = extractor.getTrackFormat(trackIndex);
+
+    // Request system HDR to SDR tone mapping on Android 13 (API 33)+ if enabled
+    if (forceSdrOutput && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+      format.setInteger(MediaFormat.KEY_COLOR_TRANSFER_REQUEST, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+    }
+
     String mime = format.getString(MediaFormat.KEY_MIME);
     if (mime == null) {
       throw new IOException("Could not determine file mime type");
@@ -120,7 +151,6 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
     this.surface = surface;
     configure();
   }
-
 
   public void setOnErrorListener(OnErrorListener onErrorListener) {
     this.onErrorListener = onErrorListener;
@@ -220,17 +250,20 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
       info.presentationTimeUs < TimeHelpers.secToUs(item.getStartTime());
 
     if (!itemEndReached && info.size != 0 && !sampleOutOfBounds && !sampleBeforeStartTime) {
-      ByteBuffer buffer;
-      try {
-        buffer = this.codec.getOutputBuffer(index);
-      } catch (Throwable e) {
-        return;
+      // In Surface output mode, getOutputBuffer(index) returns null, which is expected behavior.
+      if (surface == null) {
+        ByteBuffer buffer;
+        try {
+          buffer = this.codec.getOutputBuffer(index);
+        } catch (Throwable e) {
+          return;
+        }
+        if (buffer == null) {
+          return;
+        }
+        buffer.position(info.offset);
+        buffer.limit(info.offset + info.size);
       }
-      if (buffer == null) {
-        return;
-      }
-      buffer.position(info.offset);
-      buffer.limit(info.offset + info.size);
 
       Frame frame = getFreeFrame();
       frame.outputBufferIndex = index;
@@ -264,7 +297,7 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
 
   @Override
   public void onOutputFormatChanged(@NonNull MediaCodec codec, @NonNull MediaFormat format) {
-    // Do nothing
+    this.format = format;
   }
 
   synchronized public Long render(long compositionTimeUs) {
