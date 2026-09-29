@@ -109,7 +109,7 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
     }
     format = extractor.getTrackFormat(trackIndex);
 
-    // Request system HDR to SDR tone mapping on Android 13 (API 33)+ if enabled
+    // Request HDR to SDR tone mapping (Android 13+)
     if (forceSdrOutput && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       format.setInteger(MediaFormat.KEY_COLOR_TRANSFER_REQUEST, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
     }
@@ -118,7 +118,19 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
     if (mime == null) {
       throw new IOException("Could not determine file mime type");
     }
-    codec = MediaCodec.createDecoderByType(mime);
+
+    // Decoder fallback logic for Dolby Vision
+    try {
+      codec = MediaCodec.createDecoderByType(mime);
+    } catch (IllegalArgumentException e) {
+      if ("video/dolby-vision".equalsIgnoreCase(mime)) {
+        // Fall back to base HEVC decoder using the format configured above
+        codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC);
+      } else {
+        throw e;
+      }
+    }
+
     extractor.selectTrack(trackIndex);
     if (item.getStartTime() != 0) {
       extractor.seekTo(
