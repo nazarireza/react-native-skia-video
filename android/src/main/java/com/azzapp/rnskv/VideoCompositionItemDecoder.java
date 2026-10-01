@@ -109,26 +109,33 @@ public class VideoCompositionItemDecoder extends MediaCodec.Callback {
     }
     format = extractor.getTrackFormat(trackIndex);
 
-    // Request HDR to SDR tone mapping (Android 13+)
-    if (forceSdrOutput && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      format.setInteger(MediaFormat.KEY_COLOR_TRANSFER_REQUEST, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
-    }
-
     String mime = format.getString(MediaFormat.KEY_MIME);
     if (mime == null) {
       throw new IOException("Could not determine file mime type");
     }
 
-    // Decoder fallback logic for Dolby Vision
     try {
       codec = MediaCodec.createDecoderByType(mime);
     } catch (IllegalArgumentException e) {
       if ("video/dolby-vision".equalsIgnoreCase(mime)) {
-        // Fall back to base HEVC decoder using the format configured above
-        codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_HEVC);
+          // Switch to HEVC mime
+          mime = MediaFormat.MIMETYPE_VIDEO_HEVC;
+          format.setString(MediaFormat.KEY_MIME, mime);
+          // Remove Dolby-specific profile/level keys that confuse standard HEVC decoders
+          format.removeKey(MediaFormat.KEY_PROFILE);
+          format.removeKey(MediaFormat.KEY_LEVEL);
+          codec = MediaCodec.createDecoderByType(mime);
       } else {
-        throw e;
+          throw e;
       }
+    }
+
+    // Apply tone-mapping request ONLY AFTER confirming decoder capability
+    if (forceSdrOutput && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        MediaCodecInfo.CodecCapabilities caps = codec.getCodecInfo().getCapabilitiesForType(mime);
+        if (caps.isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_DynamicColorRange)) {
+            format.setInteger(MediaFormat.KEY_COLOR_TRANSFER_REQUEST, MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+        }
     }
 
     extractor.selectTrack(trackIndex);
